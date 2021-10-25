@@ -1,0 +1,22 @@
+version: '3.7'
+
+networks:
+    default:
+         name: NETWORKNAME
+         external: true
+
+services:
+    WatchListBackend:
+        container_name: WatchListBackend
+        stdin_open: true
+        tty: true
+        image: watchlistbackend:latest
+        hostname: WatchListBackend
+        environment:
+               - WatchList_User=USERNAME
+               - WatchList_Password=DB_PASSWORD
+               - WatchList_Host=DB_HOST
+               - WatchList_DB=DB_NAME
+        networks:
+            - default
+        restart: always
