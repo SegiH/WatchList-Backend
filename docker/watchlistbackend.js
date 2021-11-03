@@ -24,6 +24,15 @@ const config = {
      trustServerCertificate: true
 };
 
+// Date prototype to return date in format yyyymmdd. Used to convert date field for database queries
+Date.prototype.yyyymmdd = function() {
+     var yyyy = this.getFullYear().toString();
+     var mm = (this.getMonth()+1).toString(); // getMonth() is zero-based
+     var dd  = this.getDate().toString();
+     
+     return yyyy + (mm[1]?mm:"0"+mm[0]) + (dd[1]?dd:"0"+dd[0]); // padding
+};
+
 //Default route doesn't need to return anything 
 app.get('/', (req, res) => {
      res.send("");
@@ -33,6 +42,8 @@ app.get('/AddWatchList', (req, res) => {
      const watchListItemID=req.query.WatchListItemID;
      const startDate=req.query.StartDate;
      const endDate=(req.query.EndDate != '' ? req.query.EndDate : null); // Optional
+     const sourceID=req.query.WatchListSourceID;
+     const season=req.query.Season;
      const notes=req.query.Notes;
     
      if (watchListItemID === null)
@@ -40,12 +51,38 @@ app.get('/AddWatchList', (req, res) => {
      else if (startDate === null)
           res.send(["Start Date was not provided"]);
      else {
-          let params = [['WatchListItemID',sql.Int,watchListItemID],['StartDate',sql.VarChar,startDate],['Notes',sql.VarChar,notes]];
+          let params = [['WatchListItemID',sql.Int,watchListItemID],['StartDate',sql.VarChar,startDate]];
 
-          if (endDate != null)
+          let columns=`WatchListItemID,StartDate`;
+          let values = `@WatchListItemID,@StartDate`;
+
+          if (endDate != null) {
                params.push(['EndDate',sql.VarChar,endDate]);
+               columns+=`,EndDate`;
+               values+=`,@EndDate`;
+          }
 
-          const SQL=`INSERT INTO Watchlist(WatchListItemID,StartDate` + (endDate != null ? `,EndDate` : ``) + `,Notes) VALUES(@WatchListItemID,@StartDate` + (endDate != null ?  `,@EndDate` : ``) + `,@Notes);`;
+          if (sourceID != null) {
+               params.push(['WatchListSourceID',sql.Int,sourceID]);
+               columns+=`,WatchListSourceID`;
+               values+=`,@WatchListSourceID`;
+          }
+
+          if (season != null) {
+               params.push(['Season',sql.Int,season]);
+               columns+=`,Season`;
+               values+=`,@Season`;
+          }
+
+          if (notes != null) {
+               params.push(['Notes',sql.VarChar,notes]);
+               columns+=`,Notes`;
+               values+=`,@Notes`;
+          }
+  
+          const SQL=`INSERT INTO Watchlist(${columns}) VALUES (${values});`;
+
+          //const SQL=`INSERT INTO Watchlist(WatchListItemID,StartDate` + (endDate != null ? `,EndDate` : ``) + (sourceID != null ? `,WatchListSourceID` : ``) + (season != null ? `,Season` : ``) + (notes != null ? `,Notes` : ``) +  `) VALUES(@WatchListItemID,@StartDate` + (endDate != null ?  `,@EndDate` : ``) + (sourceID != null ? `,@WatchListSourceID` : ``) + (season != null ? `,@Season` : `Season=null`) + (notes != null ? `,@Notes` : ``) + `);`;
 
           execSQL(res,SQL,params,false);
      }
@@ -55,16 +92,61 @@ app.get('/AddWatchListItem', (req, res) => {
      const name=req.query.Name;
      const type=req.query.Type;
      const imdb_url=req.query.IMDB_URL;
+     const notes=req.query.Notes;
     
      if (name === null)
           res.send(["Name was not provided"]);
      else if (type === null)
           res.send(["Type was not provided"]);
      else {
-          const params = [['WatchListItemName',sql.VarChar,name],['WatchListTypeID',sql.VarChar,type],['IMDB_URL',sql.VarChar,imdb_url]];
+          const params = [['WatchListItemName',sql.VarChar,name],['WatchListTypeID',sql.VarChar,type]];
 
-          const SQL=`INSERT INTO WatchlistItems(WatchListItemName,WatchListTypeID,IMDB_URL) VALUES(@WatchListItemName,@WatchListTypeID,@IMDB_URL);`;
+          let columns=`WatchListItemName,WatchListTypeID`;
+          let values = `@WatchListItemName,@WatchListTypeID`;
+
+          if (imdb_url != null) {
+               params.push(['IMDB_URL',sql.VarChar,imdb_url]);
+               columns+=`,IMDB_URL`;
+               values+=`,@IMDB_URL`;
+          }
+
+          if (notes != null) {
+               params.push(['Notes',sql.VarChar,notes]);
+               columns+=`,Notes`;
+               values+=`,@Notes`;
+          }
+          
+          const SQL=`INSERT INTO WatchlistItems(${columns}) VALUES (${values});`;
+          //const SQL=`INSERT INTO WatchlistItems(WatchListItemName,WatchListTypeID,IMDB_URL,ItemNotes) VALUES(@WatchListItemName,@WatchListTypeID,@IMDB_URL,@Notes);`;
   
+          execSQL(res,SQL,params,false);
+     }
+});
+
+app.get('/DeleteWatchList', (req, res) => {
+     const watchListID=req.query.WatchListID;
+     
+     if (watchListID === null)
+          res.send(["ID was not provided"]);
+     else {
+          params.push(['WatchListID',sql.Int,watchListID]);
+
+          const SQL=`DELETE TOP(1) FROM Watchlist WHERE WatchListID=@WatchListID`;
+
+          execSQL(res,SQL,params,false);
+     }
+});
+
+app.get('/DeleteWatchListItem', (req, res) => {
+     const watchListItemID=req.query.WatchListItemID;
+     
+     if (watchListItemID === null)
+          res.send(["Item ID was not provided"]);
+     else {
+          params.push(['WatchListItemID',sql.Int,watchListItemID]);
+
+          const SQL=`DELETE TOP(1) FROM WatchlistItems WHERE WatchListItemID=@WatchListItemID`;
+
           execSQL(res,SQL,params,false);
      }
 });
@@ -73,6 +155,12 @@ app.get('/GetWatchList', (req, res) => {
      const searchTerm=req.query.SearchTerm;
      let sortColumn=req.query.SortColumn;
      let sortDirection=req.query.SortDirection;
+     let recordLimit=req.query.RecordLimit;
+     let sourceFilter=req.query.SourceFilter;
+     let incompleteFilter=(req.query.IncompleteFilter == "true" ? true : false);
+
+     if (recordLimit == null)
+          recordLimit=10;
 
      if (sortColumn === null || typeof sortColumn == 'undefined')
           sortColumn="WatchListItemName";
@@ -90,7 +178,30 @@ app.get('/GetWatchList', (req, res) => {
      if (searchTerm != null)
           params.push(['SearchTerm',sql.VarChar,searchTerm]);
 
-     const SQL=`SELECT WatchListID,WatchList.WatchListItemID,CONVERT(VARCHAR(20),StartDate,101) AS StartDate,CONVERT(VARCHAR(20),EndDate,101) AS EndDate,Notes FROM WatchList LEFT JOIN WatchListItems ON WatchListItems.WatchListItemID=WatchList.WatchListItemID` + (searchTerm != null ? ` WHERE WatchListItemName LIKE @SearchTerm OR Notes LIKE @SearchTerm` : ``) + ` ORDER BY @SortColumn @SortDirection`;
+     let whereClause = ``;
+     
+     if (searchTerm != null)
+          whereClause=` WHERE (WatchListItemName LIKE '%' + @SearchTerm + '%' OR Notes LIKE '%' + @SearchTerm + '%')`;
+
+     if (sourceFilter != null) {
+          if (whereClause == ``)
+               whereClause+=` WHERE `;
+          else
+               whereClause+=` AND `;
+
+          whereClause+=`WatchList.WatchListSourceID=${sourceFilter}`;
+     }
+
+     if (incompleteFilter == true) {
+          if (whereClause == ``)
+               whereClause+=` WHERE `;
+          else
+               whereClause+=` AND `;
+   
+          whereClause+=`WatchList.EndDate IS NULL`;
+     }
+
+     const SQL=`SELECT ` + (recordLimit != null ? `TOP(${recordLimit})` : ``) + ` WatchListID,WatchList.WatchListItemID,CONVERT(VARCHAR(20),StartDate,101) AS StartDate,CONVERT(VARCHAR(20),EndDate,101) AS EndDate,WatchList.WatchListSourceID,Season,Notes FROM WatchList LEFT JOIN WatchListItems ON WatchListItems.WatchListItemID=WatchList.WatchListItemID LEFT JOIN WatchListSources ON WatchListSources.WatchListSourceID=WatchList.WatchListSourceID` + whereClause + ` ORDER BY @SortColumn @SortDirection`;
      
      execSQL(res,SQL,params,true);
 });
@@ -118,38 +229,52 @@ app.get('/GetWatchListItems', (req, res) => {
      if (searchTerm != null)
           params.push(['SearchTerm',sql.VarChar,searchTerm]);
      
-     const SQL=`SELECT * FROM WatchlistItems` + (searchTerm != null ? ` WHERE WatchListItemName LIKE '%' + @SearchTerm + '%' OR IMDB_URL LIKE '%' + @SearchTerm + '%'` : ``) + ` ORDER BY @SortColumn @SortDirection`;
+     const SQL=`SELECT * FROM WatchListItems` + (searchTerm != null ? ` WHERE WatchListItemName LIKE '%' + @SearchTerm + '%' OR IMDB_URL LIKE '%' + @SearchTerm + '%'` : ``) + ` ORDER BY @SortColumn @SortDirection`;
      
      execSQL(res,SQL,params,true);
 });
 
+app.get('/GetWatchListSources', (req, res) => {
+     const SQL="SELECT * FROM WatchListSources ORDER BY WatchlistSourceName";
+  
+     execSQL(res,SQL,null,true);
+});
+
 app.get('/GetWatchListTypes', (req, res) => {
-     const SQL="SELECT * FROM WatchListTypes ORDER BY WatchlistTypeID";
+     const SQL="SELECT * FROM WatchListTypes ORDER BY WatchlistTypeName";
   
      execSQL(res,SQL,null,true);
 });
 
 app.get('/UpdateWatchList', (req, res) => {
-     const watchListID=req.query.WatchListItemID;
+     const watchListID=req.query.WatchListID;
      const watchListItemID=req.query.WatchListItemID;
      const startDate=req.query.StartDate;
-     const endDate=(req.query.EndDate != '' ? req.query.EndDate : null);
+     const endDate=(req.query.EndDate != null && req.query.endDate != 'null' ? req.query.EndDate : null);
      const notes=req.query.Notes;
+     const sourceID=req.query.WatchListSourceID;
+     const season=req.query.Season;
     
-     if (id === null)
+     if (watchListID === null)
           res.send(["ID was not provided"]);
-     if (itemId === null)
+     if (watchListItemID === null)
           res.send(["Item ID was not provided"]);
      else if (startDate === null)
           res.send(["Start Date was not provided"]);
      else {
-          let params = [['WatchListID',sql.Int,watchListID],['WatchListItemID',sql.Int,watchListItemID],['StartDate',sql.VarChar,startDate],['Notes',sql.VarChar,notes]];
+          let params = [['WatchListID',sql.Int,watchListID],['WatchListItemID',sql.Int,watchListItemID],['StartDate',sql.VarChar,new Date(startDate).yyyymmdd()],['Notes',sql.VarChar,notes]];
 
           if (endDate != null)
-               params.push(['EndDate',sql.VarChar,endDate]);
+               params.push(['EndDate',sql.VarChar,new Date(endDate).yyyymmdd()]);
 
-          const SQL=`UPDATE WatchList SET WatchListItemID=@WatchListItemID',StartDate=@StartDate,EndDate=` + (endDate != null ? '@EndDate' : null) + `,Notes=@Notes WHERE WatchListID=@WatchListID`;
-  
+          if (sourceID != null)
+               params.push(['WatchListSourceID',sql.Int,sourceID]);
+
+          if (season != null)
+               params.push(['Season',sql.VarChar,season]); // Theres a bug in Node that throws an incorrect error "Validation failed for parameter 'WatchListSourceID'. Invalid number."
+
+          const SQL=`UPDATE WatchList SET WatchListItemID=@WatchListItemID,StartDate=@StartDate` + (endDate != null ? ',EndDate=@EndDate' : ``) + (sourceID != null ? `,WatchListSourceID=@WatchListSourceID` : ``) + (season != null ? `,Season=@Season` : ``) + `,Notes=@Notes WHERE WatchListID=@WatchListID`;
+          //res.send(`SQL=*${SQL}* watchListID=*${watchListID}* watchListItemID=*${watchListItemID}* startDate=*${startDate}* endDate=*${endDate}* notes=*${notes}*,season=*${season}`);
           execSQL(res,SQL,params,false);
      }
 });
@@ -159,20 +284,18 @@ app.get('/UpdateWatchListItem', (req, res) => {
      const name=req.query.WatchListItemName;
      const typeId=req.query.WatchListTypeID;
      const imdb_url=req.query.IMDB_URL;
+     const notes=req.query.ItemNotes;
     
-     if (id === null)
+     if (watchListItemID === null)
           res.send(["ID was not provided"]);
      else if (name === null)
           res.send(["Name was not provided"]);
      else if (typeId === null)
           res.send(["Type was not provided"]);
      else {
-          const params = [['WatchListItemID',sql.Int,watchListItemID],['WatchListItemName',sql.VarChar,name],['WatchListTypeID',sql.VarChar,type],['IMDB_URL',sql.VarChar,imdb_url]];
+          const params = [['WatchListItemID',sql.Int,watchListItemID],['WatchListItemName',sql.VarChar,name],['WatchListTypeID',sql.VarChar,typeId],['IMDB_URL',sql.VarChar,imdb_url],['ItemNotes',sql.VarChar,notes]];
 
-          if (endDate != null)
-               params.push(['EndDate',sql.VarChar,endDate]);
-
-          const SQL=`UPDATE WatchlistItems SET WatchListItemName=@WatchListItemName,WatchListTypeID=@WatchListTypeID,IMDB_URL=@IMDB_URL WHERE WatchlistItemID=@WatchListItemID;`;
+          const SQL=`UPDATE WatchlistItems SET WatchListItemName=@WatchListItemName,WatchListTypeID=@WatchListTypeID,IMDB_URL=@IMDB_URL,ItemNotes=@ItemNotes WHERE WatchlistItemID=@WatchListItemID;`;
   
           execSQL(res,SQL,params,false);
      }
