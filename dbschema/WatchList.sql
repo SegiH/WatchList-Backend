@@ -1,7 +1,7 @@
 USE [WatchList]
 GO
 
-/****** Object:  Table [dbo].[WatchList]    Script Date: 10/23/2021 6:06:14 PM ******/
+/****** Object:  Table [dbo].[WatchList]    Script Date: 11/3/2021 10:16:23 AM ******/
 SET ANSI_NULLS ON
 GO
 
@@ -13,6 +13,8 @@ CREATE TABLE [dbo].[WatchList](
 	[WatchListItemID] [int] NOT NULL,
 	[StartDate] [date] NOT NULL,
 	[EndDate] [date] NULL,
+	[WatchListSourceID] [int] NULL,
+	[Season] [int] NULL,
 	[Notes] [varchar](200) NULL,
  CONSTRAINT [PK_WatchList] PRIMARY KEY CLUSTERED 
 (
