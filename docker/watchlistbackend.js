@@ -56,29 +56,41 @@ app.get('/AddWatchList', (req, res) => {
           let columns=`WatchListItemID,StartDate`;
           let values = `@WatchListItemID,@StartDate`;
 
+          columns+=`,EndDate`;
+
           if (endDate != null) {
                params.push(['EndDate',sql.VarChar,endDate]);
-               columns+=`,EndDate`;
                values+=`,@EndDate`;
+          } else {
+               values+=`,NULL`;
           }
+
+          columns+=`,WatchListSourceID`;
 
           if (sourceID != null) {
                params.push(['WatchListSourceID',sql.Int,sourceID]);
-               columns+=`,WatchListSourceID`;
                values+=`,@WatchListSourceID`;
-          }
+          } else {
+               values+=`,NULL`;
+          } 
+
+          columns+=`,Season`;
 
           if (season != null) {
                params.push(['Season',sql.Int,season]);
-               columns+=`,Season`;
                values+=`,@Season`;
-          }
+          } else {
+               values+=`,NULL`;
+          } 
 
-          if (notes != null) {
+          columns+=`,Notes`;
+
+          if (notes != null && notes != 'null') {
                params.push(['Notes',sql.VarChar,notes]);
-               columns+=`,Notes`;
                values+=`,@Notes`;
-          }
+          } else {
+               values+=`,NULL`;
+          } 
   
           const SQL=`INSERT INTO Watchlist(${columns}) VALUES (${values});`;
 
@@ -92,7 +104,7 @@ app.get('/AddWatchListItem', (req, res) => {
      const name=req.query.Name;
      const type=req.query.Type;
      const imdb_url=req.query.IMDB_URL;
-     const notes=req.query.Notes;
+     const notes=req.query.ItemNotes;
     
      if (name === null)
           res.send(["Name was not provided"]);
@@ -104,21 +116,26 @@ app.get('/AddWatchListItem', (req, res) => {
           let columns=`WatchListItemName,WatchListTypeID`;
           let values = `@WatchListItemName,@WatchListTypeID`;
 
+          columns+=`,IMDB_URL`;
+
           if (imdb_url != null) {
                params.push(['IMDB_URL',sql.VarChar,imdb_url]);
-               columns+=`,IMDB_URL`;
                values+=`,@IMDB_URL`;
-          }
+          } else {
+               values+=`,NULL`;
+          } 
 
-          if (notes != null) {
-               params.push(['Notes',sql.VarChar,notes]);
-               columns+=`,Notes`;
-               values+=`,@Notes`;
-          }
+          columns+=`,ItemNotes`;
+
+          if (notes != null && notes != 'null' && typeof notes != 'undefined') {
+               params.push(['ItemNotes',sql.VarChar,notes]);
+               values+=`,@ItemNotes`;
+          } else {
+               values+=`,NULL`;
+          } 
           
-          const SQL=`INSERT INTO WatchlistItems(${columns}) VALUES (${values});`;
-          //const SQL=`INSERT INTO WatchlistItems(WatchListItemName,WatchListTypeID,IMDB_URL,ItemNotes) VALUES(@WatchListItemName,@WatchListTypeID,@IMDB_URL,@Notes);`;
-  
+          const SQL=`IF (SELECT COUNT(*) FROM WatchListItems WHERE WatchListItemName=@WatchListItemName) = 0 INSERT INTO WatchlistItems(${columns}) VALUES (${values});`;
+ 
           execSQL(res,SQL,params,false);
      }
 });
@@ -126,6 +143,8 @@ app.get('/AddWatchListItem', (req, res) => {
 app.get('/DeleteWatchList', (req, res) => {
      const watchListID=req.query.WatchListID;
      
+     let params = [];
+
      if (watchListID === null)
           res.send(["ID was not provided"]);
      else {
@@ -140,6 +159,8 @@ app.get('/DeleteWatchList', (req, res) => {
 app.get('/DeleteWatchListItem', (req, res) => {
      const watchListItemID=req.query.WatchListItemID;
      
+     let params = [];
+
      if (watchListItemID === null)
           res.send(["Item ID was not provided"]);
      else {
@@ -271,9 +292,12 @@ app.get('/UpdateWatchList', (req, res) => {
                params.push(['WatchListSourceID',sql.Int,sourceID]);
 
           if (season != null)
-               params.push(['Season',sql.VarChar,season]); // Theres a bug in Node that throws an incorrect error "Validation failed for parameter 'WatchListSourceID'. Invalid number."
+               params.push(['Season',sql.VarChar,season]); // Theres a bug in Node that throws an incorrect error "Validation failed for parameter 'WatchListSourceID'. Invalid number." if using Int type
 
-          const SQL=`UPDATE WatchList SET WatchListItemID=@WatchListItemID,StartDate=@StartDate` + (endDate != null ? ',EndDate=@EndDate' : ``) + (sourceID != null ? `,WatchListSourceID=@WatchListSourceID` : ``) + (season != null ? `,Season=@Season` : ``) + `,Notes=@Notes WHERE WatchListID=@WatchListID`;
+          if (notes != null && notes != 'null')
+               params.push(['Notes',sql.VarChar,notes]);
+
+          const SQL=`UPDATE WatchList SET WatchListItemID=@WatchListItemID,StartDate=@StartDate` + (endDate != null ? ',EndDate=@EndDate' : `,EndDate=null`) + (sourceID != null ? `,WatchListSourceID=@WatchListSourceID` : `,WatchListSourceID=NULL`) + (season != null ? `,Season=@Season` : `,Season=NULL`) + (notes != null ? `,Notes=@Notes` : `,Notes=NULL`) + ` WHERE WatchListID=@WatchListID`;
           //res.send(`SQL=*${SQL}* watchListID=*${watchListID}* watchListItemID=*${watchListItemID}* startDate=*${startDate}* endDate=*${endDate}* notes=*${notes}*,season=*${season}`);
           execSQL(res,SQL,params,false);
      }
@@ -293,9 +317,16 @@ app.get('/UpdateWatchListItem', (req, res) => {
      else if (typeId === null)
           res.send(["Type was not provided"]);
      else {
-          const params = [['WatchListItemID',sql.Int,watchListItemID],['WatchListItemName',sql.VarChar,name],['WatchListTypeID',sql.VarChar,typeId],['IMDB_URL',sql.VarChar,imdb_url],['ItemNotes',sql.VarChar,notes]];
+          //const params = [['WatchListItemID',sql.Int,watchListItemID],['WatchListItemName',sql.VarChar,name],['WatchListTypeID',sql.VarChar,typeId],['IMDB_URL',sql.VarChar,imdb_url],['ItemNotes',sql.VarChar,notes]];
+          const params = [['WatchListItemID',sql.Int,watchListItemID],['WatchListItemName',sql.VarChar,name],['WatchListTypeID',sql.VarChar,typeId]]; // Mandatory columns
 
-          const SQL=`UPDATE WatchlistItems SET WatchListItemName=@WatchListItemName,WatchListTypeID=@WatchListTypeID,IMDB_URL=@IMDB_URL,ItemNotes=@ItemNotes WHERE WatchlistItemID=@WatchListItemID;`;
+          if (imdb_url != null)
+               params.push(['IMDB_URL',sql.VarChar,imdb_url]);
+          
+          if (notes != null && notes != 'null')
+               params.push(['ItemNotes',sql.VarChar,notes]);
+
+          const SQL=`UPDATE WatchlistItems SET WatchListItemName=@WatchListItemName,WatchListTypeID=@WatchListTypeID` + (imdb_url != null ? `,IMDB_URL=@IMDB_URL` : `,IMDB_URL=NULL`) + (notes != null ? `,ItemNotes=@ItemNotes` : `,ItemNotes=NULL`) + ` WHERE WatchlistItemID=@WatchListItemID;`;
   
           execSQL(res,SQL,params,false);
      }
@@ -357,3 +388,4 @@ function execSQL(res,SQL,params,isQuery) {
 
 app.listen(PORT, HOST);
 console.log(`Running on http://${HOST}:${PORT}`);
+
