@@ -94,8 +94,6 @@ app.get('/AddWatchList', (req, res) => {
   
           const SQL=`INSERT INTO Watchlist(${columns}) VALUES (${values});`;
 
-          //const SQL=`INSERT INTO Watchlist(WatchListItemID,StartDate` + (endDate != null ? `,EndDate` : ``) + (sourceID != null ? `,WatchListSourceID` : ``) + (season != null ? `,Season` : ``) + (notes != null ? `,Notes` : ``) +  `) VALUES(@WatchListItemID,@StartDate` + (endDate != null ?  `,@EndDate` : ``) + (sourceID != null ? `,@WatchListSourceID` : ``) + (season != null ? `,@Season` : `Season=null`) + (notes != null ? `,@Notes` : ``) + `);`;
-
           execSQL(res,SQL,params,false);
      }
 });
@@ -228,9 +226,11 @@ app.get('/GetWatchList', (req, res) => {
 });
 
 app.get('/GetWatchListItems', (req, res) => {
+     let recordLimit=req.query.RecordLimit;
      const searchTerm=req.query.SearchTerm;
      let sortColumn=req.query.SortColumn;
      let sortDirection=req.query.SortDirection;
+     const IMDBURLMissing=(req.query.IMDBURLMissing == "true" ? true : false);
 
      if (sortColumn === null || typeof sortColumn == 'undefined')
           sortColumn="WatchListItemName";
@@ -250,8 +250,8 @@ app.get('/GetWatchListItems', (req, res) => {
      if (searchTerm != null)
           params.push(['SearchTerm',sql.VarChar,searchTerm]);
      
-     const SQL=`SELECT * FROM WatchListItems` + (searchTerm != null ? ` WHERE WatchListItemName LIKE '%' + @SearchTerm + '%' OR IMDB_URL LIKE '%' + @SearchTerm + '%'` : ``) + ` ORDER BY @SortColumn @SortDirection`;
-     
+     const SQL=`SELECT ` + (recordLimit != null ? `TOP(${recordLimit})` : ``) + ` * FROM WatchListItems` + (searchTerm != null ? ` WHERE WatchListItemName LIKE '%' + @SearchTerm + '%' OR IMDB_URL LIKE '%' + @SearchTerm + '%'` : ``) + (IMDBURLMissing == true ? (searchTerm == null ? ` WHERE ` : ` AND `) + `(IMDB_URL IS NULL OR IMDB_URL='')` : ``) + ` ORDER BY @SortColumn @SortDirection`;
+     console.log(SQL); 
      execSQL(res,SQL,params,true);
 });
 
@@ -317,7 +317,6 @@ app.get('/UpdateWatchListItem', (req, res) => {
      else if (typeId === null)
           res.send(["Type was not provided"]);
      else {
-          //const params = [['WatchListItemID',sql.Int,watchListItemID],['WatchListItemName',sql.VarChar,name],['WatchListTypeID',sql.VarChar,typeId],['IMDB_URL',sql.VarChar,imdb_url],['ItemNotes',sql.VarChar,notes]];
           const params = [['WatchListItemID',sql.Int,watchListItemID],['WatchListItemName',sql.VarChar,name],['WatchListTypeID',sql.VarChar,typeId]]; // Mandatory columns
 
           if (imdb_url != null)
