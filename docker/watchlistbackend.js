@@ -13,8 +13,6 @@ const app = express();
 // Constants
 const PORT = 8080;
 const HOST = '0.0.0.0';
-const DEBUG = true;
-const PROTOCOL = "https";
 
 const config = {
      user: process.env.WatchList_User,
@@ -192,7 +190,7 @@ app.get('/GetWatchList', (req, res) => {
      if (sortDirection === null || typeof sortDirection == 'undefined' ||(sortDirection !== "ASC" && sortDirection != "DESC")) 
           sortDirection="ASC";
     
-     let params = [['SortColumn',null,sortColumn],['SortDirection',null,sortDirection]];
+     let params  = [];
 
      if (searchTerm != null)
           params.push(['SearchTerm',sql.VarChar,searchTerm]);
@@ -219,9 +217,11 @@ app.get('/GetWatchList', (req, res) => {
    
           whereClause+=`WatchList.EndDate IS NULL`;
      }
+       
+     const orderBy=` ORDER BY ${(sortColumn == "WatchListItemName" ? `WatchListItems` : `WatchList`)}.${sortColumn} ${sortDirection}`;
 
-     const SQL=`SELECT ` + (recordLimit != null ? `TOP(${recordLimit})` : ``) + ` WatchListID,WatchList.WatchListItemID,CONVERT(VARCHAR(20),StartDate,101) AS StartDate,CONVERT(VARCHAR(20),EndDate,101) AS EndDate,WatchList.WatchListSourceID,Season,Notes FROM WatchList LEFT JOIN WatchListItems ON WatchListItems.WatchListItemID=WatchList.WatchListItemID LEFT JOIN WatchListSources ON WatchListSources.WatchListSourceID=WatchList.WatchListSourceID` + whereClause + ` ORDER BY @SortColumn @SortDirection`;
-     
+     const SQL=`SELECT ` + (recordLimit != null ? `TOP(${recordLimit})` : ``) + ` WatchListID,WatchList.WatchListItemID,CONVERT(VARCHAR(20),StartDate,101) AS StartDate,CONVERT(VARCHAR(20),EndDate,101) AS EndDate,WatchList.WatchListSourceID,Season,Notes FROM WatchList LEFT JOIN WatchListItems ON WatchListItems.WatchListItemID=WatchList.WatchListItemID LEFT JOIN WatchListSources ON WatchListSources.WatchListSourceID=WatchList.WatchListSourceID` + whereClause + orderBy;
+ 
      execSQL(res,SQL,params,true);
 });
 
@@ -251,7 +251,7 @@ app.get('/GetWatchListItems', (req, res) => {
           params.push(['SearchTerm',sql.VarChar,searchTerm]);
      
      const SQL=`SELECT ` + (recordLimit != null ? `TOP(${recordLimit})` : ``) + ` * FROM WatchListItems` + (searchTerm != null ? ` WHERE WatchListItemName LIKE '%' + @SearchTerm + '%' OR IMDB_URL LIKE '%' + @SearchTerm + '%'` : ``) + (IMDBURLMissing == true ? (searchTerm == null ? ` WHERE ` : ` AND `) + `(IMDB_URL IS NULL OR IMDB_URL='')` : ``) + ` ORDER BY @SortColumn @SortDirection`;
-     console.log(SQL); 
+ 
      execSQL(res,SQL,params,true);
 });
 
@@ -263,6 +263,18 @@ app.get('/GetWatchListSources', (req, res) => {
 
 app.get('/GetWatchListTypes', (req, res) => {
      const SQL="SELECT * FROM WatchListTypes ORDER BY WatchlistTypeName";
+  
+     execSQL(res,SQL,null,true);
+});
+
+app.get('/GetWatchListMovieStats', (req, res) => {
+     const SQL="WITH GetFrequentItems AS (SELECT WatchListItemName,COUNT(*) AS ItemCount FROM WatchList WL LEFT JOIN WatchListItems WLI ON WLI.WatchListItemID=WL.WatchListItemID WHERE WLI.WatchListTypeID=1 GROUP BY WatchListItemName) SELECT TOP(10) *,(SELECT IMDB_URL FROM WatchListItems WHERE WatchListItemName=GetFrequentItems.WatchListItemName) AS IMDB_URL FROM GetFrequentItems WHERE ItemCount > 1 ORDER BY WatchListItemName DESC";
+  
+     execSQL(res,SQL,null,true);
+});
+
+app.get('/GetWatchListTVStats', (req, res) => {
+     const SQL="WITH GetFrequentItems AS (SELECT WLI.WatchListItemName,MIN(StartDate) AS StartDate,MAX(StartDate) AS EndDate,COUNT(*) AS ItemCount FROM WatchList WL LEFT JOIN WatchListItems WLI ON WLI.WatchListItemID=WL.WatchListItemID LEFT JOIN WatchListTypes WLT ON WLT.WatchListTypeID=WLI.WatchListTypeID WHERE WLI.WatchListTypeID=2 AND WL.EndDate IS NOT NULL GROUP BY WatchListItemName) SELECT TOP(10) *,(SELECT IMDB_URL FROM WatchListItems WHERE WatchListItemName=GetFrequentItems.WatchListItemName) AS IMDB_URL FROM GetFrequentItems WHERE ItemCount > 1 ORDER BY WatchListItemName DESC";
   
      execSQL(res,SQL,null,true);
 });
@@ -387,4 +399,3 @@ function execSQL(res,SQL,params,isQuery) {
 
 app.listen(PORT, HOST);
 console.log(`Running on http://${HOST}:${PORT}`);
-
