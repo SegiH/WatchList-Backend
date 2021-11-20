@@ -287,7 +287,7 @@ app.get('/UpdateWatchList', (req, res) => {
      const notes=req.query.Notes;
      const sourceID=req.query.WatchListSourceID;
      const season=req.query.Season;
-    
+ 
      if (watchListID === null)
           res.send(["ID was not provided"]);
      if (watchListItemID === null)
@@ -295,18 +295,21 @@ app.get('/UpdateWatchList', (req, res) => {
      else if (startDate === null)
           res.send(["Start Date was not provided"]);
      else {
-          let params = [['WatchListID',sql.Int,watchListID],['WatchListItemID',sql.Int,watchListItemID],['StartDate',sql.VarChar,new Date(startDate).yyyymmdd()],['Notes',sql.VarChar,notes]];
+          let params = [['WatchListID',sql.Int,watchListID],['WatchListItemID',sql.Int,watchListItemID],['StartDate',sql.VarChar,new Date(startDate).yyyymmdd()]];
 
           if (endDate != null)
                params.push(['EndDate',sql.VarChar,new Date(endDate).yyyymmdd()]);
 
           if (sourceID != null)
                params.push(['WatchListSourceID',sql.Int,sourceID]);
+ 
+          if (sourceID != null)
+               params.push(['Source',sql.VarChar,sourceID]); // Theres a bug in Node that throws an incorrect error "Validation failed for parameter 'WatchListSourceID'. Invalid number." if using Int type
 
           if (season != null)
                params.push(['Season',sql.VarChar,season]); // Theres a bug in Node that throws an incorrect error "Validation failed for parameter 'WatchListSourceID'. Invalid number." if using Int type
 
-          if (notes != null && notes != 'null')
+          if (notes != null)
                params.push(['Notes',sql.VarChar,notes]);
 
           const SQL=`UPDATE WatchList SET WatchListItemID=@WatchListItemID,StartDate=@StartDate` + (endDate != null ? ',EndDate=@EndDate' : `,EndDate=null`) + (sourceID != null ? `,WatchListSourceID=@WatchListSourceID` : `,WatchListSourceID=NULL`) + (season != null ? `,Season=@Season` : `,Season=NULL`) + (notes != null ? `,Notes=@Notes` : `,Notes=NULL`) + ` WHERE WatchListID=@WatchListID`;
@@ -399,3 +402,4 @@ function execSQL(res,SQL,params,isQuery) {
 
 app.listen(PORT, HOST);
 console.log(`Running on http://${HOST}:${PORT}`);
+
