@@ -220,7 +220,7 @@ app.get('/GetWatchList', (req, res) => {
        
      const orderBy=` ORDER BY ${(sortColumn == "WatchListItemName" ? `WatchListItems` : `WatchList`)}.${sortColumn} ${sortDirection}`;
 
-     const SQL=`SELECT ` + (recordLimit != null ? `TOP(${recordLimit})` : ``) + ` WatchListID,WatchList.WatchListItemID,CONVERT(VARCHAR(20),StartDate,101) AS StartDate,CONVERT(VARCHAR(20),EndDate,101) AS EndDate,WatchList.WatchListSourceID,Season,Notes FROM WatchList LEFT JOIN WatchListItems ON WatchListItems.WatchListItemID=WatchList.WatchListItemID LEFT JOIN WatchListSources ON WatchListSources.WatchListSourceID=WatchList.WatchListSourceID` + whereClause + orderBy;
+     const SQL=`SELECT ` + (recordLimit != null ? `TOP(${recordLimit})` : ``) + ` WatchListID,WatchList.WatchListItemID,CONVERT(VARCHAR(10),StartDate,126) AS StartDate,CONVERT(VARCHAR(10),EndDate,126) AS EndDate,WatchList.WatchListSourceID,Season,Notes FROM WatchList LEFT JOIN WatchListItems ON WatchListItems.WatchListItemID=WatchList.WatchListItemID LEFT JOIN WatchListSources ON WatchListSources.WatchListSourceID=WatchList.WatchListSourceID` + whereClause + orderBy;
  
      execSQL(res,SQL,params,true);
 });
