@@ -13,6 +13,7 @@ services:
         image: watchlistbackend:latest
         hostname: WatchListBackend
         environment:
+               - AUTH_KEY=YOUR_AUTH_KEY
                - WatchList_User=DB_USERNAME
                - WatchList_Password=DB_PASSWORD
                - WatchList_Host=DB_HOST

@@ -8,6 +8,8 @@ const Connection = require('tedious').Connection;
 const Request = require('tedious').Request;
 const TYPES = require('tedious').TYPES;
 
+const AUTH_KEY=process.env.AUTH_KEY;
+
 const app = express();
 
 // Constants
@@ -31,18 +33,31 @@ Date.prototype.yyyymmdd = function() {
      return yyyy + (mm[1]?mm:"0"+mm[0]) + (dd[1]?dd:"0"+dd[0]); // padding
 };
 
+// Middleware that is called before any endpoint is reached
+app.use(function (req, res, next) {
+     const auth=(typeof req.query.auth_key !== 'undefined' ? req.query.auth_key : null);
+     // *** DELETE ME LATER!!!! *** 
+     //** DO NOT DEPLOY UNTIL YOU HAVE FINISHED TESTING THE FRONTEND THEN REMOVE IS_TEST AND ITS USAGE
+     const isTest=(typeof req.query.is_test !== 'undefined' ? req.query.is_test : null);
+
+    if (auth === null || AUTH_KEY == null || (auth != null && auth != AUTH_KEY))
+         return res.status(403).send('Unauthorized');
+    else //Carry on with the request chain
+         next();
+});
+
 //Default route doesn't need to return anything 
 app.get('/', (req, res) => {
      res.send("");
 });
 
 app.get('/AddWatchList', (req, res) => {
-     const watchListItemID=req.query.WatchListItemID;
-     const startDate=req.query.StartDate;
-     const endDate=(req.query.EndDate != '' ? req.query.EndDate : null); // Optional
-     const sourceID=req.query.WatchListSourceID;
-     const season=req.query.Season;
-     const notes=req.query.Notes;
+     const watchListItemID=(typeof req.query.WatchListItemID !== 'undefined' ? req.query.WatchListItemID : null);
+     const startDate=(typeof req.query.StartDate !== 'undefined' ? req.query.StartDate : null);
+     const endDate=(typeof req.query.EndDate !== 'undefined' ? req.query.EndDate : null); // Optional
+     const sourceID=(typeof req.query.WatchListSourceID !== 'undefined' ? req.query.WatchListSourceID : null);
+     const season=(typeof req.query.Season !== 'undefined' ? req.query.Season : null);
+     const notes=(typeof req.query.Notes !== 'undefined' ? req.query.Notes : null);
     
      if (watchListItemID === null)
           res.send(["Item ID was not provided"]);
@@ -90,17 +105,17 @@ app.get('/AddWatchList', (req, res) => {
                values+=`,NULL`;
           } 
   
-          const SQL=`INSERT INTO Watchlist(${columns}) VALUES (${values});`;
+          const SQL=`INSERT INTO WatchList(${columns}) VALUES (${values});`;
 
           execSQL(res,SQL,params,false);
      }
 });
 
 app.get('/AddWatchListItem', (req, res) => {
-     const name=req.query.Name;
-     const type=req.query.Type;
-     const imdb_url=req.query.IMDB_URL;
-     const notes=req.query.ItemNotes;
+     const name=(typeof req.query.Name !== 'undefined' ? req.query.Name : null);
+     const type=(typeof req.query.Type !== 'undefined' ? req.query.Type : null);
+     const imdb_url=(typeof req.query.IMDB_URL !== 'undefined' ? req.query.IMDB_URL : null);
+     const notes=(typeof req.query.Notes !== 'undefined' ? req.query.Notes : null);
     
      if (name === null)
           res.send(["Name was not provided"]);
@@ -130,14 +145,41 @@ app.get('/AddWatchListItem', (req, res) => {
                values+=`,NULL`;
           } 
           
-          const SQL=`IF (SELECT COUNT(*) FROM WatchListItems WHERE WatchListItemName=@WatchListItemName) = 0 INSERT INTO WatchlistItems(${columns}) VALUES (${values});`;
+          const SQL=`IF (SELECT COUNT(*) FROM WatchListItems WHERE WatchListItemName=@WatchListItemName) = 0 INSERT INTO WatchListItems(${columns}) VALUES (${values});`;
  
           execSQL(res,SQL,params,false);
      }
 });
 
+app.get('/AddWatchListQueueItem', (req, res) => {
+     const watchListItemID=(typeof req.query.WatchListItemID !== 'undefined' ? req.query.WatchListItemID : null);
+     const notes=(typeof req.query.Notes !== 'undefined' ? req.query.Notes : null);
+ 
+     if (watchListItemID === null)
+          res.send(["Queue Item ID was not provided"]);
+     else {
+          let params = [['WatchListItemID',sql.Int,watchListItemID]];
+
+          let columns=`WatchListItemID`;
+          let values = `@WatchListItemID`;
+
+          columns+=`,Notes`;
+
+          if (notes != null && notes != 'null') {
+               params.push(['Notes',sql.VarChar,notes]);
+               values+=`,@Notes`;
+          } else {
+               values+=`,NULL`;
+          } 
+  
+          const SQL=`INSERT INTO WatchListQueueItems(${columns}) VALUES (${values});`;
+
+          execSQL(res,SQL,params,false);
+     }
+});
+
 app.get('/DeleteWatchList', (req, res) => {
-     const watchListID=req.query.WatchListID;
+     const watchListID=(typeof req.query.WatchListID !== 'undefined' ? req.query.WatchListID : null);
      
      let params = [];
 
@@ -146,14 +188,14 @@ app.get('/DeleteWatchList', (req, res) => {
      else {
           params.push(['WatchListID',sql.Int,watchListID]);
 
-          const SQL=`DELETE TOP(1) FROM Watchlist WHERE WatchListID=@WatchListID`;
+          const SQL=`DELETE TOP(1) FROM WatchList WHERE WatchListID=@WatchListID`;
 
           execSQL(res,SQL,params,false);
      }
 });
 
 app.get('/DeleteWatchListItem', (req, res) => {
-     const watchListItemID=req.query.WatchListItemID;
+     const watchListItemID=(typeof req.query.WatchListItemID !== 'undefined' ? req.query.WatchListItemID : null);
      
      let params = [];
 
@@ -162,19 +204,35 @@ app.get('/DeleteWatchListItem', (req, res) => {
      else {
           params.push(['WatchListItemID',sql.Int,watchListItemID]);
 
-          const SQL=`DELETE TOP(1) FROM WatchlistItems WHERE WatchListItemID=@WatchListItemID`;
+          const SQL=`DELETE TOP(1) FROM WatchListItems WHERE WatchListItemID=@WatchListItemID`;
+
+          execSQL(res,SQL,params,false);
+     }
+});
+
+app.get('/DeleteWatchListQueueItem', (req, res) => {
+     const watchListQueueItemID=(typeof req.query.WatchListQueueItemID !== 'undefined' ? req.query.WatchListQueueItemID : null);
+     
+     let params = [];
+
+     if (watchListQueueItemID === null)
+          res.send(["Queue Item ID was not provided"]);
+     else {
+          params.push(['WatchListQueueItemID',sql.Int,watchListQueueItemID]);
+
+          const SQL=`DELETE TOP(1) FROM WatchListQueueItems WHERE WatchListQueueItemID=@WatchListQueueItemID`;
 
           execSQL(res,SQL,params,false);
      }
 });
 
 app.get('/GetWatchList', (req, res) => {
-     const searchTerm=req.query.SearchTerm;
-     let sortColumn=req.query.SortColumn;
-     let sortDirection=req.query.SortDirection;
-     let recordLimit=req.query.RecordLimit;
-     let sourceFilter=req.query.SourceFilter;
-     let incompleteFilter=(req.query.IncompleteFilter == "true" ? true : false);
+     const searchTerm=(typeof req.query.SearchTerm !== 'undefined' ? req.query.SearchTerm : null); 
+     let sortColumn=(typeof req.query.SortColumn !== 'undefined' ? req.query.SortColumn : null);
+     let sortDirection=(typeof req.query.SortDirection !== 'undefined' ? req.query.SortDirection : null);
+     let recordLimit=(typeof req.query.RecordLimit !== 'undefined' ? req.query.RecordLimit : null);
+     let sourceFilter=(typeof req.query.SourceFilter !== 'undefined' ? req.query.SourceFilter : null);
+     let incompleteFilter=(req.query.IncompleteFilter === "true" ? true : false);
 
      if (recordLimit == null)
           recordLimit=10;
@@ -192,13 +250,12 @@ app.get('/GetWatchList', (req, res) => {
     
      let params  = [];
 
-     if (searchTerm != null)
-          params.push(['SearchTerm',sql.VarChar,searchTerm]);
-
      let whereClause = ``;
-     
-     if (searchTerm != null)
+
+     if (searchTerm != null) {
+          params.push(['SearchTerm',sql.VarChar,searchTerm]);
           whereClause=` WHERE (WatchListItemName LIKE '%' + @SearchTerm + '%' OR Notes LIKE '%' + @SearchTerm + '%')`;
+     }
 
      if (sourceFilter != null) {
           if (whereClause == ``)
@@ -226,11 +283,11 @@ app.get('/GetWatchList', (req, res) => {
 });
 
 app.get('/GetWatchListItems', (req, res) => {
-     let recordLimit=req.query.RecordLimit;
-     const searchTerm=req.query.SearchTerm;
-     let sortColumn=req.query.SortColumn;
-     let sortDirection=req.query.SortDirection;
+     const searchTerm=(typeof req.query.SearchTerm !== 'undefined' ? req.query.SearchTerm : null); 
      const IMDBURLMissing=(req.query.IMDBURLMissing == "true" ? true : false);
+     let recordLimit=(typeof req.query.RecordLimit !== 'undefined' ? req.query.RecordLimit : null);
+     let sortColumn=(typeof req.query.SortColumn !== 'undefined' ? req.query.SortColumn : null);
+     let sortDirection=(typeof req.query.SortDirection !== 'undefined' ? req.query.SortDirection : null);
 
      if (sortColumn === null || typeof sortColumn == 'undefined')
           sortColumn="WatchListItemName";
@@ -255,14 +312,30 @@ app.get('/GetWatchListItems', (req, res) => {
      execSQL(res,SQL,params,true);
 });
 
+app.get('/GetWatchListQueue', (req, res) => {
+     const searchTerm=(typeof req.query.SearchTerm !== 'undefined' ? req.query.SearchTerm : null); 
+
+     let params  = [];
+     let whereClause = ``;
+
+     if (searchTerm != null) {
+          params.push(['SearchTerm',sql.VarChar,searchTerm]);
+          whereClause=` WHERE Notes LIKE '%' + @SearchTerm + '%'`;
+     }
+ 
+     const SQL=`SELECT WatchListQueueItemID, WatchListItemID, Notes FROM WatchListQueueItems` + whereClause;
+ 
+     execSQL(res,SQL,params,true);
+});
+
 app.get('/GetWatchListSources', (req, res) => {
-     const SQL="SELECT * FROM WatchListSources ORDER BY WatchlistSourceName";
+     const SQL="SELECT * FROM WatchListSources ORDER BY WatchListSourceName";
   
      execSQL(res,SQL,null,true);
 });
 
 app.get('/GetWatchListTypes', (req, res) => {
-     const SQL="SELECT * FROM WatchListTypes ORDER BY WatchlistTypeName";
+     const SQL="SELECT * FROM WatchListTypes ORDER BY WatchListTypeName";
   
      execSQL(res,SQL,null,true);
 });
@@ -280,13 +353,13 @@ app.get('/GetWatchListTVStats', (req, res) => {
 });
 
 app.get('/UpdateWatchList', (req, res) => {
-     const watchListID=req.query.WatchListID;
-     const watchListItemID=req.query.WatchListItemID;
-     const startDate=req.query.StartDate;
-     const endDate=(req.query.EndDate != null && req.query.endDate != 'null' ? req.query.EndDate : null);
-     const notes=req.query.Notes;
-     const sourceID=req.query.WatchListSourceID;
-     const season=req.query.Season;
+     const watchListID=(typeof req.query.WatchListID !== 'undefined' ? req.query.WatchListID : null);
+     const watchListItemID=(typeof req.query.WatchListItemID !== 'undefined' ? req.query.WatchListItemID : null);
+     const startDate=(typeof req.query.StartDate !== 'undefined' ? req.query.StartDate : null);
+     const endDate=(typeof req.query.EndDate !== 'undefined' ? req.query.EndDate : null); // Optional
+     const sourceID=(typeof req.query.WatchListSourceID !== 'undefined' ? req.query.WatchListSourceID : null);
+     const season=(typeof req.query.Season !== 'undefined' ? req.query.Season : null);
+     const notes=(typeof req.query.Notes !== 'undefined' ? req.query.Notes : null);
  
      if (watchListID === null)
           res.send(["ID was not provided"]);
@@ -319,11 +392,11 @@ app.get('/UpdateWatchList', (req, res) => {
 });
 
 app.get('/UpdateWatchListItem', (req, res) => {
-     const watchListItemID=req.query.WatchListItemID;
-     const name=req.query.WatchListItemName;
-     const typeId=req.query.WatchListTypeID;
-     const imdb_url=req.query.IMDB_URL;
-     const notes=req.query.ItemNotes;
+     const watchListItemID=(typeof req.query.WatchListItemID !== 'undefined' ? req.query.WatchListItemID : null);
+     const name=(typeof req.query.Name !== 'undefined' ? req.query.Name : null);
+     const type=(typeof req.query.Type !== 'undefined' ? req.query.Type : null);
+     const imdb_url=(typeof req.query.IMDB_URL !== 'undefined' ? req.query.IMDB_URL : null);
+     const notes=(typeof req.query.ItemNotes !== 'undefined' ? req.query.ItemNotes : null);
     
      if (watchListItemID === null)
           res.send(["ID was not provided"]);
@@ -340,8 +413,30 @@ app.get('/UpdateWatchListItem', (req, res) => {
           if (notes != null && notes != 'null')
                params.push(['ItemNotes',sql.VarChar,notes]);
 
-          const SQL=`UPDATE WatchlistItems SET WatchListItemName=@WatchListItemName,WatchListTypeID=@WatchListTypeID` + (imdb_url != null ? `,IMDB_URL=@IMDB_URL` : `,IMDB_URL=NULL`) + (notes != null ? `,ItemNotes=@ItemNotes` : `,ItemNotes=NULL`) + ` WHERE WatchlistItemID=@WatchListItemID;`;
+          const SQL=`UPDATE WatchListItems SET WatchListItemName=@WatchListItemName,WatchListTypeID=@WatchListTypeID` + (imdb_url != null ? `,IMDB_URL=@IMDB_URL` : `,IMDB_URL=NULL`) + (notes != null ? `,ItemNotes=@ItemNotes` : `,ItemNotes=NULL`) + ` WHERE WatchListItemID=@WatchListItemID;`;
   
+          execSQL(res,SQL,params,false);
+     }
+});
+
+app.get('/UpdateWatchListQueueItem', (req, res) => {
+     const watchListQueueItemID=(typeof req.query.WatchListQueueItemID !== 'undefined' ? req.query.WatchListQueueItemID : null);
+     const watchListItemID=(typeof req.query.WatchListItemID !== 'undefined' ? req.query.WatchListItemID : null);
+     const notes=(typeof req.query.Notes !== 'undefined' ? req.query.Notes : null);
+ 
+     if (watchListQueueItemID === null)
+          res.send(["Queue Item ID was not provided"]);
+     else {
+          let params = [['WatchListQueueItemID',sql.Int,watchListQueueItemID]];
+
+          if (watchListItemID !== null)
+               params.push(['WatchListItemID',sql.Int,watchListItemID]);
+
+          if (notes != null)
+               params.push(['Notes',sql.VarChar,notes]);
+
+          const SQL=`UPDATE WatchListQueueItems SET ` + (watchListItemID !== null ? `WatchListItemID=@WatchListItemID,` : ``) + (notes != null ? `Notes=@Notes` : `,Notes=NULL`) + ` WHERE WatchListQueueItemID=@WatchListQueueItemID`;
+          //res.send(`SQL=*${SQL}* watchListID=*${watchListQueueItemID}* watchListItemID=*${watchListItemID}*`);
           execSQL(res,SQL,params,false);
      }
 });
@@ -402,4 +497,3 @@ function execSQL(res,SQL,params,isQuery) {
 
 app.listen(PORT, HOST);
 console.log(`Running on http://${HOST}:${PORT}`);
-
