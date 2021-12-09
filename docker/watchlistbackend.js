@@ -36,9 +36,6 @@ Date.prototype.yyyymmdd = function() {
 // Middleware that is called before any endpoint is reached
 app.use(function (req, res, next) {
      const auth=(typeof req.query.auth_key !== 'undefined' ? req.query.auth_key : null);
-     // *** DELETE ME LATER!!!! *** 
-     //** DO NOT DEPLOY UNTIL YOU HAVE FINISHED TESTING THE FRONTEND THEN REMOVE IS_TEST AND ITS USAGE
-     const isTest=(typeof req.query.is_test !== 'undefined' ? req.query.is_test : null);
 
     if (auth === null || AUTH_KEY == null || (auth != null && auth != AUTH_KEY))
          return res.status(403).send('Unauthorized');
