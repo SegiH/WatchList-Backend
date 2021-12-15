@@ -16,6 +16,7 @@ Docker Installation:
    - Replace NETWORKNAME with your own Docker network name
    - Replace YOUR_AUTH_KEY with a secure password. You will need to enter this in the front end app
    - (Optional) Follow these steps if you want tobe able to search IMDB directly in the app. Otherwise, do not set the environment var RAPIDAPIKEY
+   
      a. Visit [RapidAPI](rapidapi.com) and create a free account.
      b. Click on "My APIs" at the top right
      c. Click on "Add New API" at the top right
