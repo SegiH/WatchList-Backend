@@ -371,7 +371,6 @@ app.get('/SearchIMDB', (req, res) => {
                qs: {s: searchTerm, page: '1', r: 'json'},
                headers: {
                     'x-rapidapi-host': 'movie-database-imdb-alternative.p.rapidapi.com',
-                    //'x-rapidapi-key': 'b018b77bd5mshcffef52feb56ea0p15cabcjsn34b09de9bfbb',
                     'x-rapidapi-key': RAPIDAPI_KEY,
                     useQueryString: true
                }
