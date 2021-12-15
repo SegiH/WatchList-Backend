@@ -7,9 +7,10 @@ const sql = require('mssql');
 const Connection = require('tedious').Connection;
 const Request = require('tedious').Request;
 const TYPES = require('tedious').TYPES;
+const request = require('request');
 
 const AUTH_KEY=process.env.AUTH_KEY;
-
+const RAPIDAPI_KEY=process.env.RAPIDAPI_KEY
 const app = express();
 
 // Constants
@@ -142,7 +143,7 @@ app.get('/AddWatchListItem', (req, res) => {
                values+=`,NULL`;
           } 
           
-          const SQL=`IF (SELECT COUNT(*) FROM WatchListItems WHERE WatchListItemName=@WatchListItemName) = 0 INSERT INTO WatchListItems(${columns}) VALUES (${values});`;
+          const SQL=`IF (SELECT COUNT(*) FROM WatchListItems WHERE IMDB_URL=@IMDB_URL) = 0 INSERT INTO WatchListItems(${columns}) VALUES (${values});`;
  
           execSQL(res,SQL,params,false);
      }
@@ -347,6 +348,41 @@ app.get('/GetWatchListTVStats', (req, res) => {
      const SQL="WITH GetFrequentItems AS (SELECT WLI.WatchListItemName,MIN(StartDate) AS StartDate,MAX(StartDate) AS EndDate,COUNT(*) AS ItemCount FROM WatchList WL LEFT JOIN WatchListItems WLI ON WLI.WatchListItemID=WL.WatchListItemID LEFT JOIN WatchListTypes WLT ON WLT.WatchListTypeID=WLI.WatchListTypeID WHERE WLI.WatchListTypeID=2 AND WL.EndDate IS NOT NULL GROUP BY WatchListItemName) SELECT TOP(10) *,(SELECT IMDB_URL FROM WatchListItems WHERE WatchListItemName=GetFrequentItems.WatchListItemName) AS IMDB_URL FROM GetFrequentItems WHERE ItemCount > 1 ORDER BY WatchListItemName DESC";
   
      execSQL(res,SQL,null,true);
+});
+
+app.get('/IsIMDBSearchEnabled', (req, res) => {
+     if (RAPIDAPI_KEY == null)
+          res.send(false)
+     else
+          res.send(true)
+});
+
+app.get('/SearchIMDB', (req, res) => {
+     const searchTerm=(typeof req.query.SearchTerm !== 'undefined' ? req.query.SearchTerm : null); 
+    
+     if (searchTerm === null)
+          res.send("Search term not provided");
+     else if (RAPIDAPI_KEY == null)
+          res.send("IMDB search is not enabled");
+     else {
+          const options = {
+               method: 'GET',
+               url: 'https://movie-database-imdb-alternative.p.rapidapi.com/',
+               qs: {s: searchTerm, page: '1', r: 'json'},
+               headers: {
+                    'x-rapidapi-host': 'movie-database-imdb-alternative.p.rapidapi.com',
+                    //'x-rapidapi-key': 'b018b77bd5mshcffef52feb56ea0p15cabcjsn34b09de9bfbb',
+                    'x-rapidapi-key': RAPIDAPI_KEY,
+                    useQueryString: true
+               }
+          };
+
+          request(options, function (error, response, body) {
+	       if (error) throw new Error(error);
+
+               res.send(body);
+          });
+     }
 });
 
 app.get('/UpdateWatchList', (req, res) => {
