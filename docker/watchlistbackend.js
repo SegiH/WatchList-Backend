@@ -425,8 +425,8 @@ app.get('/UpdateWatchList', (req, res) => {
 
 app.get('/UpdateWatchListItem', (req, res) => {
      const watchListItemID=(typeof req.query.WatchListItemID !== 'undefined' ? req.query.WatchListItemID : null);
-     const name=(typeof req.query.Name !== 'undefined' ? req.query.Name : null);
-     const type=(typeof req.query.Type !== 'undefined' ? req.query.Type : null);
+     const name=(typeof req.query.WatchListItemName !== 'undefined' ? req.query.WatchListItemName : null);
+     const typeID=(typeof req.query.Type !== 'undefined' ? req.query.Type : null);
      const imdb_url=(typeof req.query.IMDB_URL !== 'undefined' ? req.query.IMDB_URL : null);
      const notes=(typeof req.query.ItemNotes !== 'undefined' ? req.query.ItemNotes : null);
     
@@ -434,7 +434,7 @@ app.get('/UpdateWatchListItem', (req, res) => {
           res.send(["ID was not provided"]);
      else if (name === null)
           res.send(["Name was not provided"]);
-     else if (typeId === null)
+     else if (typeID === null)
           res.send(["Type was not provided"]);
      else {
           const params = [['WatchListItemID',sql.Int,watchListItemID],['WatchListItemName',sql.VarChar,name],['WatchListTypeID',sql.VarChar,typeId]]; // Mandatory columns
