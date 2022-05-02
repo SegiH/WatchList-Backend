@@ -275,7 +275,7 @@ app.get('/GetWatchList', (req, res) => {
        
      const orderBy=` ORDER BY ${(sortColumn == "WatchListItemName" ? `WatchListItems` : `WatchList`)}.${sortColumn} ${sortDirection}`;
 
-     const SQL=`SELECT ` + (recordLimit != null ? `TOP(${recordLimit})` : ``) + ` WatchListID,WatchList.WatchListItemID,CONVERT(VARCHAR(10),StartDate,126) AS StartDate,CONVERT(VARCHAR(10),EndDate,126) AS EndDate,WatchList.WatchListSourceID,Season,Notes FROM WatchList LEFT JOIN WatchListItems ON WatchListItems.WatchListItemID=WatchList.WatchListItemID LEFT JOIN WatchListSources ON WatchListSources.WatchListSourceID=WatchList.WatchListSourceID` + whereClause + orderBy;
+     const SQL=`SELECT ` + (recordLimit != null ? `TOP(${recordLimit})` : ``) + ` WatchListID,WatchList.WatchListItemID,WatchListTypes.WatchListTypeID,CONVERT(VARCHAR(10),StartDate,126) AS StartDate,CONVERT(VARCHAR(10),EndDate,126) AS EndDate,WatchList.WatchListSourceID,Season,Notes FROM WatchList LEFT JOIN WatchListItems ON WatchListItems.WatchListItemID=WatchList.WatchListItemID LEFT JOIN WatchListTypes ON WatchListTypes.WatchListTypeID=WatchListItems.WatchListTypeID LEFT JOIN WatchListSources ON WatchListSources.WatchListSourceID=WatchList.WatchListSourceID` + whereClause + orderBy;
  
      execSQL(res,SQL,params,true);
 });
@@ -321,7 +321,7 @@ app.get('/GetWatchListQueue', (req, res) => {
           whereClause=` WHERE Notes LIKE '%' + @SearchTerm + '%'`;
      }
  
-     const SQL=`SELECT WatchListQueueItemID, WatchListItemID, Notes FROM WatchListQueueItems` + whereClause;
+     const SQL=`SELECT WatchListQueueItemID, WatchListItems.WatchListItemID, WatchListTypes.WatchListTypeID, Notes FROM WatchListQueueItems LEFT JOIN WatchListItems ON WatchListItems.WatchListItemID=WatchListQueueItems.WatchListItemID LEFT JOIN WatchListTypes ON WatchListTypes.WatchListTypeID=WatchListItems.WatchListTypeID ` + whereClause;
  
      execSQL(res,SQL,params,true);
 });
@@ -329,7 +329,7 @@ app.get('/GetWatchListQueue', (req, res) => {
 app.get('/GetWatchListSources', (req, res) => {
      const SQL="SELECT * FROM WatchListSources ORDER BY WatchListSourceName";
   
-     execSQL(res,SQL,null,true);
+     execSQL(res,SQL,null,true)
 });
 
 app.get('/GetWatchListTypes', (req, res) => {
@@ -367,10 +367,10 @@ app.get('/SearchIMDB', (req, res) => {
      else {
           const options = {
                method: 'GET',
-               url: 'https://movie-database-imdb-alternative.p.rapidapi.com/',
+               url: 'https://imdb107.p.rapidapi.com/',
                qs: {s: searchTerm, page: '1', r: 'json'},
                headers: {
-                    'x-rapidapi-host': 'movie-database-imdb-alternative.p.rapidapi.com',
+                    'x-rapidapi-host': 'movie-database-alternative.p.rapidapi.com',
                     'x-rapidapi-key': RAPIDAPI_KEY,
                     useQueryString: true
                }
@@ -426,7 +426,7 @@ app.get('/UpdateWatchList', (req, res) => {
 app.get('/UpdateWatchListItem', (req, res) => {
      const watchListItemID=(typeof req.query.WatchListItemID !== 'undefined' ? req.query.WatchListItemID : null);
      const name=(typeof req.query.WatchListItemName !== 'undefined' ? req.query.WatchListItemName : null);
-     const typeID=(typeof req.query.Type !== 'undefined' ? req.query.Type : null);
+     const typeID=(typeof req.query.WatchListTypeID !== 'undefined' ? req.query.WatchListTypeID : null);
      const imdb_url=(typeof req.query.IMDB_URL !== 'undefined' ? req.query.IMDB_URL : null);
      const notes=(typeof req.query.ItemNotes !== 'undefined' ? req.query.ItemNotes : null);
     
@@ -437,7 +437,7 @@ app.get('/UpdateWatchListItem', (req, res) => {
      else if (typeID === null)
           res.send(["Type was not provided"]);
      else {
-          const params = [['WatchListItemID',sql.Int,watchListItemID],['WatchListItemName',sql.VarChar,name],['WatchListTypeID',sql.VarChar,typeId]]; // Mandatory columns
+          const params = [['WatchListItemID',sql.Int,watchListItemID],['WatchListItemName',sql.VarChar,name],['WatchListTypeID',sql.VarChar,typeID]]; // Mandatory columns
 
           if (imdb_url != null)
                params.push(['IMDB_URL',sql.VarChar,imdb_url]);
