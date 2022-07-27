@@ -8,6 +8,9 @@ const Connection = require('tedious').Connection;
 const Request = require('tedious').Request;
 const TYPES = require('tedious').TYPES;
 const request = require('request');
+const swaggerUi = require('swagger-ui-express');
+const YAML = require('yamljs');
+const swaggerDocument = YAML.load('swagger.yml');
 
 const AUTH_KEY=process.env.AUTH_KEY;
 const RAPIDAPI_KEY=process.env.RAPIDAPI_KEY
@@ -34,11 +37,13 @@ Date.prototype.yyyymmdd = function() {
      return yyyy + (mm[1]?mm:"0"+mm[0]) + (dd[1]?dd:"0"+dd[0]); // padding
 };
 
+app.use('/swagger', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
+
 // Middleware that is called before any endpoint is reached
 app.use(function (req, res, next) {
      const auth=(typeof req.query.auth_key !== 'undefined' ? req.query.auth_key : null);
 
-    if (auth === null || AUTH_KEY == null || (auth != null && auth != AUTH_KEY))
+    if (req.url !== "/swagger" && (auth === null || AUTH_KEY == null || (auth != null && auth != AUTH_KEY)))
          return res.status(403).send('Unauthorized');
     else //Carry on with the request chain
          next();
@@ -49,7 +54,7 @@ app.get('/', (req, res) => {
      res.send("");
 });
 
-app.get('/AddWatchList', (req, res) => {
+app.put('/AddWatchList', (req, res) => {
      const watchListItemID=(typeof req.query.WatchListItemID !== 'undefined' ? req.query.WatchListItemID : null);
      const startDate=(typeof req.query.StartDate !== 'undefined' ? req.query.StartDate : null);
      const endDate=(typeof req.query.EndDate !== 'undefined' ? req.query.EndDate : null); // Optional
@@ -109,9 +114,9 @@ app.get('/AddWatchList', (req, res) => {
      }
 });
 
-app.get('/AddWatchListItem', (req, res) => {
+app.put('/AddWatchListItem', (req, res) => {
      const name=(typeof req.query.Name !== 'undefined' ? req.query.Name : null);
-     const type=(typeof req.query.Type !== 'undefined' ? req.query.Type : null);
+     const type=(typeof req.query.WatchListTypeID !== 'undefined' ? req.query.WatchListTypeID : null);
      const imdb_url=(typeof req.query.IMDB_URL !== 'undefined' ? req.query.IMDB_URL : null);
      const notes=(typeof req.query.Notes !== 'undefined' ? req.query.Notes : null);
     
@@ -149,7 +154,7 @@ app.get('/AddWatchListItem', (req, res) => {
      }
 });
 
-app.get('/AddWatchListQueueItem', (req, res) => {
+app.put('/AddWatchListQueueItem', (req, res) => {
      const watchListItemID=(typeof req.query.WatchListItemID !== 'undefined' ? req.query.WatchListItemID : null);
      const notes=(typeof req.query.Notes !== 'undefined' ? req.query.Notes : null);
  
@@ -176,7 +181,7 @@ app.get('/AddWatchListQueueItem', (req, res) => {
      }
 });
 
-app.get('/DeleteWatchList', (req, res) => {
+app.put('/DeleteWatchList', (req, res) => {
      const watchListID=(typeof req.query.WatchListID !== 'undefined' ? req.query.WatchListID : null);
      
      let params = [];
@@ -192,7 +197,7 @@ app.get('/DeleteWatchList', (req, res) => {
      }
 });
 
-app.get('/DeleteWatchListItem', (req, res) => {
+app.put('/DeleteWatchListItem', (req, res) => {
      const watchListItemID=(typeof req.query.WatchListItemID !== 'undefined' ? req.query.WatchListItemID : null);
      
      let params = [];
@@ -208,7 +213,7 @@ app.get('/DeleteWatchListItem', (req, res) => {
      }
 });
 
-app.get('/DeleteWatchListQueueItem', (req, res) => {
+app.put('/DeleteWatchListQueueItem', (req, res) => {
      const watchListQueueItemID=(typeof req.query.WatchListQueueItemID !== 'undefined' ? req.query.WatchListQueueItemID : null);
      
      let params = [];
@@ -378,7 +383,6 @@ app.get('/SearchIMDB', (req, res) => {
 
           request(options, function (error, response, body) {
 	       if (error) throw new Error(error);
-
                res.send(body);
           });
      }
