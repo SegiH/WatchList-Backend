@@ -10,7 +10,7 @@
         "express": "4.17.1",
         "mssql": "7.0.0",
         "request": "^2.88.2",
-        "requests": "0.3.0",
+        "swagger-ui-express": "^4.5.0",
         "yamljs": "^0.3.0"
     },
     "author": "Segi Hovav",
