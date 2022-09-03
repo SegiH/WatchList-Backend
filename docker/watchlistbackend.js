@@ -344,13 +344,13 @@ app.get('/GetWatchListTypes', (req, res) => {
 });
 
 app.get('/GetWatchListMovieStats', (req, res) => {
-     const SQL="WITH GetFrequentItems AS (SELECT WatchListItemName,COUNT(*) AS ItemCount FROM WatchList WL LEFT JOIN WatchListItems WLI ON WLI.WatchListItemID=WL.WatchListItemID WHERE WLI.WatchListTypeID=1 GROUP BY WatchListItemName) SELECT TOP(10) *,(SELECT IMDB_URL FROM WatchListItems WHERE WatchListItemName=GetFrequentItems.WatchListItemName) AS IMDB_URL FROM GetFrequentItems WHERE ItemCount > 1 ORDER BY WatchListItemName DESC";
+     const SQL="WITH GetFrequentItems AS (SELECT WatchListItemName,COUNT(*) AS ItemCount FROM WatchList WL LEFT JOIN WatchListItems WLI ON WLI.WatchListItemID=WL.WatchListItemID WHERE WLI.WatchListTypeID=1 GROUP BY WatchListItemName) SELECT TOP(10) *,(SELECT IMDB_URL FROM WatchListItems WHERE WatchListItemName=GetFrequentItems.WatchListItemName) AS IMDB_URL FROM GetFrequentItems WHERE ItemCount > 1 ORDER BY WatchListItemName ASC";
   
      execSQL(res,SQL,null,true);
 });
 
 app.get('/GetWatchListTVStats', (req, res) => {
-     const SQL="WITH GetFrequentItems AS (SELECT WLI.WatchListItemName,MIN(StartDate) AS StartDate,MAX(StartDate) AS EndDate,COUNT(*) AS ItemCount FROM WatchList WL LEFT JOIN WatchListItems WLI ON WLI.WatchListItemID=WL.WatchListItemID LEFT JOIN WatchListTypes WLT ON WLT.WatchListTypeID=WLI.WatchListTypeID WHERE WLI.WatchListTypeID=2 AND WL.EndDate IS NOT NULL GROUP BY WatchListItemName) SELECT TOP(10) *,(SELECT IMDB_URL FROM WatchListItems WHERE WatchListItemName=GetFrequentItems.WatchListItemName) AS IMDB_URL FROM GetFrequentItems WHERE ItemCount > 1 ORDER BY WatchListItemName DESC";
+     const SQL="WITH GetFrequentItems AS (SELECT WLI.WatchListItemName,MIN(StartDate) AS StartDate,MAX(StartDate) AS EndDate,COUNT(*) AS ItemCount FROM WatchList WL LEFT JOIN WatchListItems WLI ON WLI.WatchListItemID=WL.WatchListItemID LEFT JOIN WatchListTypes WLT ON WLT.WatchListTypeID=WLI.WatchListTypeID WHERE WLI.WatchListTypeID=2 AND WL.EndDate IS NOT NULL GROUP BY WatchListItemName) SELECT TOP(10) *,(SELECT IMDB_URL FROM WatchListItems WHERE WatchListItemName=GetFrequentItems.WatchListItemName) AS IMDB_URL FROM GetFrequentItems WHERE ItemCount > 1 ORDER BY WatchListItemName ASC";
   
      execSQL(res,SQL,null,true);
 });
