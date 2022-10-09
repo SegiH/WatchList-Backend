@@ -1,13 +1,15 @@
 # WatchList-Backend
-This is the backend for WatchList application. It includes a [Swagger](https://swagger.io/) backend that can be used to test each endpoint.
+This is the backend for WatchList application. It includes a [Swagger](https://swagger.io/) backend that can be used to test each endpoint. It supports multiple users using the application.
 
 Requirements: Docker or Node to host the backend, SQL Server for the backend database.
 
 Database Setup:
 
 1. Create a database named WatchList in SQL Server.
-1. Run each of the SQL files in the dbschema folder to create the necessary database tables.
-1. Create a user account and grant SELECT, INSERT UPDATE and DELETE access to all of the tables in this DB.
+1. Edit SQL\Setup.sql and set the master key encryption password (write down this password in case you forget it!!)
+1. Run the SQL script SQL\Setup.sql on the database WatchList as a user with db_creator permission. All of the commands should complete without any errors.
+1. Create user account: Edit SQL\CreateUser.sql and set the username, realname, password and backend url that this service will be available at (https://watchlist-backend.yoursite.com)
+1. Change password: Use the SQL script SQL\SetPassword.sql to change the password for a user account
 
 Docker Installation:
 
@@ -28,6 +30,11 @@ Docker Installation:
      i. Add a variable in the compose file RAPIDAPIKEY=APIKEY
      j. Important note: RapidAPI allows you 100 free searches per month. In order for this API to work, you have to "subscribe" by adding your credit card with RapidAPI. It appears to work similarly to Amazon where they won't charge you if you do not go over your allotted API usage. If you do not add a credit card, the API will return an "Unsubscribed" error when you try to use it.
    - Replace the DB related environment variables with your own DB settings. The backend must be a SQL Server database.
+1. If you use a reverse proxy:
+   - Make sure to allow GET, OPTIONS and PUT
+   - Allow CORS header for the following URLS: http://localhost, http://localhost:8100 and the public URL that this WatchList backend service will be accessible at.
+   - Allow credentials in the header
+   - Allow WL_Username and WL_Password in the header
 1. Build the backend container `docker-compose -f watchlistbackend-compose.yml up -d`
 1. Run `node watchlistbackend.js`
 1. Visit http://localhost:8080/swagger to view the documentation for each endpoint
@@ -37,5 +44,6 @@ Non-Docker Installation:
 1. Set the following environment variables on the Node server to configure the DB connection: WatchList_User, WatchList_Password, WatchList_Host and WatchList_DB
 1. Set the environment variable AUTH_KEY to a password of your choice. You will need to enter this in the front end app
 1. See note above if you want to enable IMDB search in the app
+1. See step above if you are behind a reverse proxy
 1. Run `node watchlistbackend.js`
 1. Visit http://localhost:8080/swagger to view the documentation for each endpoint

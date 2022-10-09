@@ -1,16 +1,17 @@
-'use strict';
+//use 'strict';
 
 const backend="SQLServer";
-const util = require('util');
+const bodyParser = require('body-parser');
+// const cors = require('cors');
 const express = require('express');
+const session = require('express-session');
 const sql = require('mssql');
-const Connection = require('tedious').Connection;
 const Request = require('tedious').Request;
 const TYPES = require('tedious').TYPES;
 const request = require('request');
 const swaggerUi = require('swagger-ui-express');
-const YAML = require('yamljs');
-const swaggerDocument = YAML.load('swagger.yml');
+const swaggerJSDoc = require('swagger-jsdoc');
+const util = require('util');
 
 const AUTH_KEY=process.env.AUTH_KEY;
 const RAPIDAPI_KEY=process.env.RAPIDAPI_KEY
@@ -21,12 +22,18 @@ const PORT = 8080;
 const HOST = '0.0.0.0';
 
 const config = {
-     user: process.env.WatchList_User,
-     password: process.env.WatchList_Password,
-     server: process.env.WatchList_Host,
-     database: process.env.WatchList_DB,
+     user: 'Watchlist',
+     password: 'watchlist2021',
+     server: 'sqlserver.hovav.org',
+     database: 'WatchList',
      trustServerCertificate: true
 };
+
+/*var corsOptions = {
+  origin: 'http://localhost:8100',
+  credentials: true,
+  optionsSuccessStatus: 200 // some legacy browsers (IE11, various SmartTVs) choke on 204
+}*/
 
 // Date prototype to return date in format yyyymmdd. Used to convert date field for database queries
 Date.prototype.yyyymmdd = function() {
@@ -37,16 +44,194 @@ Date.prototype.yyyymmdd = function() {
      return yyyy + (mm[1]?mm:"0"+mm[0]) + (dd[1]?dd:"0"+dd[0]); // padding
 };
 
-app.use('/swagger', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
+const memoryStore = new session.MemoryStore();
+
+const sessionConfig = {
+     secret: '2RausqaEmiFjKHE4U5',
+     resave: 'save',
+     saveUninitialized: true,
+     store: memoryStore,
+     cookie: {
+          //sameSite: 'none',
+          //secure: 'false',
+          maxAge: 1000 * 60 * 60 * 24 * 7
+     }
+}
+
+const swaggerOptions = {  
+     swaggerDefinition: {
+          openapi: '3.0.1',
+          info: {  
+               title:'WatchList API',
+               description: 'WatchList API',
+               version:'2.0.0',
+           displayRequestDuration: true
+          },
+          components: {
+               schemas: {
+                    WatchList: {
+                         properties: {
+                              WatchListID: {
+                                   type: "integer",
+                                   description: "WatchList ID"
+                              },
+                              WatchListItemID: {
+                                   type: "integer",
+                                   description: "WatchList Item ID"
+                              },
+                              StartDate: {
+                                   type: "string",
+                                   format: "date",
+                                   description: "WatchList Start Date"
+                              },
+                              EndDate: {
+                                   type: "string",
+                                   format: "date",
+                                   description: "WatchList End Date"
+                              },
+                              WatchListSourceID: {
+                                   type: "integer",
+                                   description: "WatchList Source"
+                              },
+                              Season: {
+                                   type: "integer",
+                                   description: "WatchList Season"
+                              },
+                              Notes: {
+                                   type: "string",
+                                   description: "WatchList Notes"
+                              },
+                         }
+                    },
+                    WatchListItem: {
+                         properties: {
+                              WatchListItemID: {
+                                   type: "integer",
+                                   description: "WatchList Item ID"
+                              },
+                              WatchListItemName: {
+                                   type: "string",
+                                   format: "date",
+                                   description: "WatchList Item Name"
+                              },
+                              WatchListTypeID: {
+                                   type: "integer",
+                                   description: "WatchList Type"
+                              },
+                              IMDB_URL: {
+                                   type: "string",
+                                   description: "WatchList Item IMDB URL"
+                              },
+                              ItemNotes: {
+                                   type: "string",
+                                   description: "WatchList Item Notes"
+                              },
+                         }
+                    },
+                    WatchListQueueItems: {
+                         properties: {
+                              WatchListQueueItemID: {
+                                   type: "integer",
+                                   description: "WatchList Queue Item ID"
+                              },
+                              WatchListItemID: {
+                                   type: "integer",
+                                   description: "WatchList Item ID"
+                              },
+                              Notes: {
+                                   type: "string",
+                                   description: "WatchList Item Notes"
+                              },
+                         }
+                    },
+                    WatchListSources: {
+                         properties: {
+                              WatchListSourceID: {
+                                   type: "integer",
+                                   description: "WatchList Source ID"
+                              },
+                              WatchListSourceName: {
+                                   type: "string",
+                                   description: "WatchList Source Name"
+                              }
+                         }
+                    },
+                    WatchListTypes: {
+                         properties: {
+                              WatchListTypeID: {
+                                   type: "integer",
+                                   description: "WatchList Type ID"
+                              },
+                              WatchListTypeName: {
+                                   type: "string",
+                                   description: "WatchList Type Name"
+                              }
+                         }
+                    }
+               },
+               securitySchemes: {
+                    bearerAuth: {
+                         type: 'http',
+                         scheme: 'bearer',
+                         bearerFormat: 'JWT',
+                    }
+               }
+          },
+          security: [{
+               bearerAuth: []
+          }],
+          servers: [{
+               url: 'http://localhost:8000',
+               description: 'Development server',
+          },
+          {
+               url: 'https://watchlist-backend.yoursite.com',
+               description: 'Production Server',
+          }],
+          tags: [{
+               name: 'WatchList',
+               description: 'WatchList'
+          },
+          {
+               name: 'WatchListItems',
+               description: 'WatchListItems'
+          },
+          {
+               name: 'WatchListQueue',
+               description: 'WatchListQueue'
+          },
+          {
+               name: 'WatchListSources',
+               description: 'WatchListSources'
+          },
+          {
+               name: 'WatchListTypes',
+               description: 'WatchListTypes'
+          }],
+     },  
+     apis:['watchlistbackend.js']
+}
+app.use(bodyParser.urlencoded({extended: false})); 
+app.use(express.static('swagger'));
+app.use(session(sessionConfig));
+
+const swaggerDocs = swaggerJSDoc(swaggerOptions);
+app.use('/swagger',swaggerUi.serve,swaggerUi.setup(swaggerDocs));  
+// app.use(cors(corsOptions));
 
 // Middleware that is called before any endpoint is reached
 app.use(function (req, res, next) {
-     const auth=(typeof req.query.auth_key !== 'undefined' ? req.query.auth_key : null);
-
-    if (req.url !== "/swagger" && (auth === null || AUTH_KEY == null || (auth != null && auth != AUTH_KEY)))
-         return res.status(403).send('Unauthorized');
-    else //Carry on with the request chain
-         next();
+     if (req.session.page_views) {
+          req.session.page_views++;
+          
+          if (req.url.startsWith("/Login")) {
+               res.send(["OK",req.session.userPayload]);
+          } else {
+               next();
+          }
+     } else if (req.url.startsWith("/Login")){
+          next();
+     }
 });
 
 //Default route doesn't need to return anything 
@@ -54,7 +239,58 @@ app.get('/', (req, res) => {
      res.send("");
 });
 
+/** 
+ * @swagger 
+ * /AddWatchList: 
+ *    put:
+ *        tags: 
+ *          - WatchList
+ *        summary: Add new WatchList item
+ *        description: Add WatchList item
+ *        parameters:
+ *           - name: WatchListItemID
+ *             in: query
+ *             description: WatchList Item ID
+ *             required: true
+ *             schema:
+ *                  type: integer
+ *           - name: StartDate
+ *             in: query
+ *             description: Start Date
+ *             required: true
+ *             schema:
+ *                  type: string
+ *           - name: EndDate
+ *             in: query
+ *             description: End Date
+ *             required: false
+ *             schema:
+ *                  type: string
+ *           - name: WatchListSourceID
+ *             in: query
+ *             description: WatchList Source ID
+ *             required: false
+ *             schema:
+ *                  type: integer
+ *           - name: Season
+ *             in: query
+ *             description: Season
+ *             required: false
+ *             schema:
+ *                  type: integer
+ *           - name: Notes
+ *             in: query
+ *             description: Notes
+ *             required: false
+ *             schema:
+ *                  type: string
+ *        responses:  
+ *          200: 
+ *            description: "['OK',''] on success, ['ERROR','ERROR MESSAGE'] on error"
+ *   
+ */
 app.put('/AddWatchList', (req, res) => {
+     const userID=(typeof req.session.userPayload !== 'undefined' ? req.session.userPayload[0].UserID : null);
      const watchListItemID=(typeof req.query.WatchListItemID !== 'undefined' ? req.query.WatchListItemID : null);
      const startDate=(typeof req.query.StartDate !== 'undefined' ? req.query.StartDate : null);
      const endDate=(typeof req.query.EndDate !== 'undefined' ? req.query.EndDate : null); // Optional
@@ -62,15 +298,20 @@ app.put('/AddWatchList', (req, res) => {
      const season=(typeof req.query.Season !== 'undefined' ? req.query.Season : null);
      const notes=(typeof req.query.Notes !== 'undefined' ? req.query.Notes : null);
     
-     if (watchListItemID === null)
+     if (userID === null) {
+          res.send(["User ID was not provided"]);
+          return;
+     } else if (watchListItemID === null) {
           res.send(["Item ID was not provided"]);
-     else if (startDate === null)
+          return;
+     } else if (startDate === null) {
           res.send(["Start Date was not provided"]);
-     else {
-          let params = [['WatchListItemID',sql.Int,watchListItemID],['StartDate',sql.VarChar,startDate]];
+          return;
+     } else {
+          let params = [['UserID',sql.Int,userID],['WatchListItemID',sql.Int,watchListItemID],['StartDate',sql.VarChar,startDate]];
 
-          let columns=`WatchListItemID,StartDate`;
-          let values = `@WatchListItemID,@StartDate`;
+          let columns=`UserID,WatchListItemID,StartDate`;
+          let values = `@UserID,@WatchListItemID,@StartDate`;
 
           columns+=`,EndDate`;
 
@@ -110,21 +351,61 @@ app.put('/AddWatchList', (req, res) => {
   
           const SQL=`INSERT INTO WatchList(${columns}) VALUES (${values});`;
 
-          execSQL(res,SQL,params,false);
+          execSQL(res,SQL,params,true);
      }
 });
 
+/** 
+ * @swagger 
+ * /AddWatchListItem: 
+ *    put:
+ *        tags: 
+ *          - WatchListItems
+ *        summary: Add new WatchList item
+ *        description: Add WatchList item
+ *        parameters:
+ *           - name: WatchListItemName
+ *             in: query
+ *             description: WatchListItemName
+ *             required: true
+ *             schema:
+ *                  type: string
+ *           - name: Type
+ *             in: query
+ *             description: Type
+ *             required: true
+ *             schema:
+ *                  type: string
+ *           - name: IMDB_URL
+ *             in: query
+ *             description: IMDB_URL
+ *             required: false
+ *             schema:
+ *                  type: string
+ *           - name: Notes
+ *             in: query
+ *             description: Notes
+ *             required: false
+ *             schema:
+ *                  type: string
+ *        responses:  
+ *          200: 
+ *            description: "['OK',''] on success, ['ERROR','ERROR MESSAGE'] on error"
+ *   
+ */
 app.put('/AddWatchListItem', (req, res) => {
-     const name=(typeof req.query.Name !== 'undefined' ? req.query.Name : null);
+     const name=(typeof req.query.WatchListItemName !== 'undefined' ? req.query.WatchListItemName : null);
      const type=(typeof req.query.WatchListTypeID !== 'undefined' ? req.query.WatchListTypeID : null);
      const imdb_url=(typeof req.query.IMDB_URL !== 'undefined' ? req.query.IMDB_URL : null);
      const notes=(typeof req.query.Notes !== 'undefined' ? req.query.Notes : null);
     
-     if (name === null)
-          res.send(["Name was not provided"]);
-     else if (type === null)
-          res.send(["Type was not provided"]);
-     else {
+     if (name === null) {
+          res.send(["ERROR","Name was not provided"]);
+          return;
+     } else if (type === null) {
+          res.send(["ERROR","Type was not provided"]);
+          return;
+     } else {
           const params = [['WatchListItemName',sql.VarChar,name],['WatchListTypeID',sql.VarChar,type]];
 
           let columns=`WatchListItemName,WatchListTypeID`;
@@ -148,23 +429,54 @@ app.put('/AddWatchListItem', (req, res) => {
                values+=`,NULL`;
           } 
           
-          const SQL=`IF (SELECT COUNT(*) FROM WatchListItems WHERE IMDB_URL=@IMDB_URL) = 0 INSERT INTO WatchListItems(${columns}) VALUES (${values});`;
- 
-          execSQL(res,SQL,params,false);
+          const SQL=`IF (SELECT COUNT(*) FROM WatchListItems WHERE IMDB_URL=@IMDB_URL) = 0 INSERT INTO WatchListItems(${columns}) VALUES (${values}); ELSE SELECT 'Exists Already'`;
+
+          execSQL(res,SQL,params,true);
      }
 });
 
+/** 
+ * @swagger 
+ * /AddWatchListQueueItem: 
+ *    put:
+ *        tags: 
+ *          - WatchListQueue
+ *        summary: Add new WatchList Queue item
+ *        description: Add WatchList Queue item
+ *        parameters:
+ *           - name: WatchListItemID
+ *             in: query
+ *             description: WatchList Item ID
+ *             required: true
+ *             schema:
+ *                  type: integer
+ *           - name: Notes
+ *             in: query
+ *             description: Notes
+ *             required: false
+ *             schema:
+ *                  type: string
+ *        responses:  
+ *          200: 
+ *            description: "['OK',''] on success, ['ERROR','ERROR MESSAGE'] on error"
+ *   
+ */
 app.put('/AddWatchListQueueItem', (req, res) => {
+     const userID=(typeof req.session.userPayload !== 'undefined' ? req.session.userPayload[0].UserID : null);
      const watchListItemID=(typeof req.query.WatchListItemID !== 'undefined' ? req.query.WatchListItemID : null);
      const notes=(typeof req.query.Notes !== 'undefined' ? req.query.Notes : null);
  
-     if (watchListItemID === null)
+     if (userID === null) {
+          res.send(["User ID was not provided"]);
+          return;
+     } else if (watchListItemID === null) {
           res.send(["Queue Item ID was not provided"]);
-     else {
-          let params = [['WatchListItemID',sql.Int,watchListItemID]];
+          return;
+     } else {
+          let params = [['UserID',sql.Int,userID],['WatchListItemID',sql.Int,watchListItemID]];
 
-          let columns=`WatchListItemID`;
-          let values = `@WatchListItemID`;
+          let columns=`UserID,WatchListItemID`;
+          let values = `@UserID,@WatchListItemID`;
 
           columns+=`,Notes`;
 
@@ -177,35 +489,73 @@ app.put('/AddWatchListQueueItem', (req, res) => {
   
           const SQL=`INSERT INTO WatchListQueueItems(${columns}) VALUES (${values});`;
 
-          execSQL(res,SQL,params,false);
+          execSQL(res,SQL,params,true,true);
      }
 });
 
+/** 
+ * @swagger 
+ * /DeleteWatchList: 
+ *    put:
+ *        tags: 
+ *          - WatchList
+ *        summary: Delete WatchList
+ *        description: Delete WatchList
+ *        parameters:
+ *           - name: WatchListID
+ *             in: query
+ *             description: WatchList ID
+ *             required: true
+ *             schema:
+ *                  type: integer
+ *        responses:  
+ *          200: 
+ *            description: "['OK',''] on success, ['ERROR','ERROR MESSAGE'] on error"
+ *   
+ */
 app.put('/DeleteWatchList', (req, res) => {
      const watchListID=(typeof req.query.WatchListID !== 'undefined' ? req.query.WatchListID : null);
-     
-     let params = [];
 
-     if (watchListID === null)
+     if (watchListID === null) {
           res.send(["ID was not provided"]);
-     else {
-          params.push(['WatchListID',sql.Int,watchListID]);
-
+          return;
+     } else {
+          const params = [['WatchListID',sql.Int,watchListID]];
+          
           const SQL=`DELETE TOP(1) FROM WatchList WHERE WatchListID=@WatchListID`;
 
           execSQL(res,SQL,params,false);
      }
 });
 
+/** 
+ * @swagger 
+ * /DeleteWatchListItem: 
+ *    put:
+ *        tags: 
+ *          - WatchListItems
+ *        summary: Delete WatchList Item
+ *        description: Delete WatchList Item
+ *        parameters:
+ *           - name: WatchListItemID
+ *             in: query
+ *             description: WatchList Item ID
+ *             required: true
+ *             schema:
+ *                  type: integer
+ *        responses:  
+ *          200: 
+ *            description: "['OK',''] on success, ['ERROR','ERROR MESSAGE'] on error"
+ *   
+ */
 app.put('/DeleteWatchListItem', (req, res) => {
      const watchListItemID=(typeof req.query.WatchListItemID !== 'undefined' ? req.query.WatchListItemID : null);
      
-     let params = [];
-
-     if (watchListItemID === null)
+     if (watchListItemID === null) {
           res.send(["Item ID was not provided"]);
-     else {
-          params.push(['WatchListItemID',sql.Int,watchListItemID]);
+          return;
+     } else {
+          const params =[['WatchListItemID',sql.Int,watchListItemID]];
 
           const SQL=`DELETE TOP(1) FROM WatchListItems WHERE WatchListItemID=@WatchListItemID`;
 
@@ -213,15 +563,34 @@ app.put('/DeleteWatchListItem', (req, res) => {
      }
 });
 
+/** 
+ * @swagger 
+ * /DeleteWatchListQueueItem: 
+ *    put:
+ *        tags: 
+ *          - WatchListQueue
+ *        summary: Delete WatchList Queue Item
+ *        description: Delete WatchList  QueueItem
+ *        parameters:
+ *           - name: WatchListQueueItemID
+ *             in: query
+ *             description: WatchList Queue Item ID
+ *             required: true
+ *             schema:
+ *                  type: integer
+ *        responses:  
+ *          200: 
+ *            description: "['OK',''] on success, ['ERROR','ERROR MESSAGE'] on error"
+ *   
+ */
 app.put('/DeleteWatchListQueueItem', (req, res) => {
      const watchListQueueItemID=(typeof req.query.WatchListQueueItemID !== 'undefined' ? req.query.WatchListQueueItemID : null);
-     
-     let params = [];
 
-     if (watchListQueueItemID === null)
+     if (watchListQueueItemID === null) {
           res.send(["Queue Item ID was not provided"]);
-     else {
-          params.push(['WatchListQueueItemID',sql.Int,watchListQueueItemID]);
+          return;
+     } else {
+          const params =[['WatchListQueueItemID',sql.Int,watchListQueueItemID]];
 
           const SQL=`DELETE TOP(1) FROM WatchListQueueItems WHERE WatchListQueueItemID=@WatchListQueueItemID`;
 
@@ -229,6 +598,56 @@ app.put('/DeleteWatchListQueueItem', (req, res) => {
      }
 });
 
+/** 
+ * @swagger 
+ * /GetWatchList: 
+ *    get:
+ *        tags: 
+ *          - WatchList
+ *        summary: Get WatchList records
+ *        description: Get WatchList records
+ *        parameters:
+ *           - name: RecordLimit
+ *             in: query
+ *             description: Record Limit
+ *             required: false
+ *             schema:
+ *                  type: integer
+ *           - name: SearchTerm
+ *             in: query
+ *             description: Search Term
+ *             required: false
+ *             schema:
+ *                  type: string
+ *           - name: SortColumn
+ *             in: query
+ *             description: Sort Column
+ *             required: false
+ *             schema:
+ *                  type: string
+ *           - name: SortDirection
+ *             in: query
+ *             description: Sort Direction
+ *             required: false
+ *             schema:
+ *                  type: string
+ *           - name: SourceFilter
+ *             in: query
+ *             description: SourceFilter
+ *             required: false
+ *             schema:
+ *                  type: integer
+ *           - name: IncompleteFilter
+ *             in: query
+ *             description: IncompleteFilter
+ *             required: false
+ *             schema:
+ *                  type: boolean
+ *        responses:  
+ *          200: 
+ *            description: "WatchList records on success, ['ERROR','ERROR MESSAGE'] on error"
+ *   
+ */
 app.get('/GetWatchList', (req, res) => {
      const searchTerm=(typeof req.query.SearchTerm !== 'undefined' ? req.query.SearchTerm : null); 
      let sortColumn=(typeof req.query.SortColumn !== 'undefined' ? req.query.SortColumn : null);
@@ -257,25 +676,15 @@ app.get('/GetWatchList', (req, res) => {
 
      if (searchTerm != null) {
           params.push(['SearchTerm',sql.VarChar,searchTerm]);
-          whereClause=` WHERE (WatchListItemName LIKE '%' + @SearchTerm + '%' OR Notes LIKE '%' + @SearchTerm + '%')`;
+          whereClause+=(whereClause === `` ? ` WHERE ` : ` AND `) + ` (WatchListItemName LIKE '%' + @SearchTerm + '%' OR Notes LIKE '%' + @SearchTerm + '%')`;
      }
 
      if (sourceFilter != null) {
-          if (whereClause == ``)
-               whereClause+=` WHERE `;
-          else
-               whereClause+=` AND `;
-
-          whereClause+=`WatchList.WatchListSourceID=${sourceFilter}`;
+          whereClause+=(whereClause === `` ? ` WHERE ` : ` AND `) + ` WatchList.WatchListSourceID=${sourceFilter}`;
      }
 
      if (incompleteFilter == true) {
-          if (whereClause == ``)
-               whereClause+=` WHERE `;
-          else
-               whereClause+=` AND `;
-   
-          whereClause+=`WatchList.EndDate IS NULL`;
+          whereClause+=(whereClause === `` ? ` WHERE ` : ` AND `) + ` WatchList.EndDate IS NULL`;
      }
        
      const orderBy=` ORDER BY ${(sortColumn == "WatchListItemName" ? `WatchListItems` : `WatchList`)}.${sortColumn} ${sortDirection}`;
@@ -285,6 +694,50 @@ app.get('/GetWatchList', (req, res) => {
      execSQL(res,SQL,params,true);
 });
 
+/** 
+ * @swagger 
+ * /GetWatchListItems: 
+ *    get:
+ *        tags: 
+ *          - WatchListItems
+ *        summary: Get WatchList Items records
+ *        description: Get WatchList Items records
+ *        parameters:
+ *           - name: RecordLimit
+ *             in: query
+ *             description: Record Limit
+ *             required: false
+ *             schema:
+ *                  type: integer
+ *           - name: SearchTerm
+ *             in: query
+ *             description: Search Term
+ *             required: false
+ *             schema:
+ *                  type: string
+ *           - name: SortColumn
+ *             in: query
+ *             description: Sort Column
+ *             required: false
+ *             schema:
+ *                  type: string
+ *           - name: SortDirection
+ *             in: query
+ *             description: Sort Direction
+ *             required: false
+ *             schema:
+ *                  type: string
+ *           - name: IMDBURLMissing
+ *             in: query
+ *             description: IMDBURLMissing
+ *             required: false
+ *             schema:
+ *                  type: boolean
+ *        responses:  
+ *          200: 
+ *            description: "WatchList item records on success, ['ERROR','ERROR MESSAGE'] on error"
+ *   
+ */
 app.get('/GetWatchListItems', (req, res) => {
      const searchTerm=(typeof req.query.SearchTerm !== 'undefined' ? req.query.SearchTerm : null); 
      const IMDBURLMissing=(req.query.IMDBURLMissing == "true" ? true : false);
@@ -306,24 +759,58 @@ app.get('/GetWatchListItems', (req, res) => {
           sortDirection="ASC";
      
      let params = [['SortColumn',null,sortColumn],['SortDirection',null,sortDirection]];
+     let whereClause='';
 
-     if (searchTerm != null)
+     if (searchTerm != null) {
           params.push(['SearchTerm',sql.VarChar,searchTerm]);
+          whereClause=`WHERE (WatchListItemName LIKE '%' + @SearchTerm + '%' OR IMDB_URL LIKE '%' + @SearchTerm + '%')`;
+     }
+
+     if (IMDBURLMissing == true) {
+          whereClause+=(whereClause == '' ? ` WHERE ` : ` AND `) + ` IMDB_URL IS NULL OR IMDB_URL=''`;
+     }
      
-     const SQL=`SELECT ` + (recordLimit != null ? `TOP(${recordLimit})` : ``) + ` * FROM WatchListItems` + (searchTerm != null ? ` WHERE WatchListItemName LIKE '%' + @SearchTerm + '%' OR IMDB_URL LIKE '%' + @SearchTerm + '%'` : ``) + (IMDBURLMissing == true ? (searchTerm == null ? ` WHERE ` : ` AND `) + `(IMDB_URL IS NULL OR IMDB_URL='')` : ``) + ` ORDER BY @SortColumn @SortDirection`;
+     const SQL=`SELECT ` + (recordLimit != null ? `TOP(${recordLimit})` : ``) + ` * FROM WatchListItems ${whereClause} ORDER BY @SortColumn @SortDirection`;
  
      execSQL(res,SQL,params,true);
 });
 
+/** 
+ * @swagger 
+ * /GetWatchListQueue: 
+ *    get:
+ *        tags: 
+ *          - WatchListQueue
+ *        summary: Get WatchList Queue Items records
+ *        description: Get WatchList Queue Items records
+ *        parameters:
+ *           - name: SearchTerm
+ *             in: query
+ *             description: Search Term
+ *             required: false
+ *             schema:
+ *                  type: string
+ *        responses:  
+ *          200: 
+ *            description: "WatchList Queue records on success, ['ERROR','ERROR MESSAGE'] on error"
+ *   
+ */
 app.get('/GetWatchListQueue', (req, res) => {
+     const userID=(typeof req.session.userPayload !== 'undefined' ? req.session.userPayload[0].UserID : null);
      const searchTerm=(typeof req.query.SearchTerm !== 'undefined' ? req.query.SearchTerm : null); 
 
+     if (userID === null) {
+          res.send(["User ID was not provided"]);
+          return;
+     }
+
      let params  = [];
-     let whereClause = ``;
+     let whereClause = ` WHERE UserID=@UserID`;
+     params.push(['UserID',sql.Int,userID]);
 
      if (searchTerm != null) {
           params.push(['SearchTerm',sql.VarChar,searchTerm]);
-          whereClause=` WHERE Notes LIKE '%' + @SearchTerm + '%'`;
+          whereClause=+` AND (WatchListItemName LIKE '%' + @SearchTerm + '%' OR Notes LIKE '%' + @SearchTerm + '%')`;
      }
  
      const SQL=`SELECT WatchListQueueItemID, WatchListItems.WatchListItemID, WatchListTypes.WatchListTypeID, Notes FROM WatchListQueueItems LEFT JOIN WatchListItems ON WatchListItems.WatchListItemID=WatchListQueueItems.WatchListItemID LEFT JOIN WatchListTypes ON WatchListTypes.WatchListTypeID=WatchListItems.WatchListTypeID ` + whereClause;
@@ -331,45 +818,234 @@ app.get('/GetWatchListQueue', (req, res) => {
      execSQL(res,SQL,params,true);
 });
 
+/** 
+ * @swagger 
+ * /GetWatchListSources: 
+ *    get:
+ *        tags: 
+ *          - WatchListSources
+ *        summary: Get WatchList Sources
+ *        description: Get WatchList Sources
+ *        responses:  
+ *          200: 
+ *            description: "WatchList source on success, ['ERROR','ERROR MESSAGE'] on error"
+ *   
+ */
 app.get('/GetWatchListSources', (req, res) => {
      const SQL="SELECT * FROM WatchListSources ORDER BY WatchListSourceName";
   
      execSQL(res,SQL,null,true)
 });
 
+/** 
+ * @swagger 
+ * /GetWatchListTypes: 
+ *    get:
+ *        tags: 
+ *          - WatchListTypes
+ *        summary: Get WatchList Types
+ *        description: Get WatchList Types
+ *        responses:  
+ *          200: 
+ *            description: "WatchList types on success, ['ERROR','ERROR MESSAGE'] on error"
+ *   
+ */
 app.get('/GetWatchListTypes', (req, res) => {
      const SQL="SELECT * FROM WatchListTypes ORDER BY WatchListTypeName";
   
      execSQL(res,SQL,null,true);
 });
 
+/** 
+ * @swagger 
+ * /GetWatchListMovieStats: 
+ *    get:
+ *        tags: 
+ *          - WatchList
+ *        summary: Get WatchList Movie Stats
+ *        description: Get WatchList Movie Stats
+ *        responses:  
+ *          200: 
+ *            description: "WatchList movie stats on success, ['ERROR','ERROR MESSAGE'] on error"
+ *   
+ */
 app.get('/GetWatchListMovieStats', (req, res) => {
-     const SQL="WITH GetFrequentItems AS (SELECT WatchListItemName,COUNT(*) AS ItemCount FROM WatchList WL LEFT JOIN WatchListItems WLI ON WLI.WatchListItemID=WL.WatchListItemID WHERE WLI.WatchListTypeID=1 GROUP BY WatchListItemName) SELECT TOP(10) *,(SELECT IMDB_URL FROM WatchListItems WHERE WatchListItemName=GetFrequentItems.WatchListItemName) AS IMDB_URL FROM GetFrequentItems WHERE ItemCount > 1 ORDER BY WatchListItemName ASC";
+     const userID=(typeof req.session.userPayload !== 'undefined' ? req.session.userPayload[0].UserID : null);
+
+     if (userID === null) {
+          res.send(["ERROR","User ID was not provided"]);
+          return;
+     }
+     
+     const params=[['UserID',sql.Int,userID]];
+
+     const SQL="WITH GetFrequentItems AS (SELECT UserID,WatchListItemName,COUNT(*) AS ItemCount FROM WatchList WL LEFT JOIN WatchListItems WLI ON WLI.WatchListItemID=WL.WatchListItemID WHERE WLI.WatchListTypeID=1 GROUP BY UserID,WatchListItemName) SELECT TOP(10) *,(SELECT IMDB_URL FROM WatchListItems WHERE WatchListItemName=GetFrequentItems.WatchListItemName) AS IMDB_URL FROM GetFrequentItems WHERE UserID=@UserID AND ItemCount > 1 ORDER BY WatchListItemName ASC";
   
-     execSQL(res,SQL,null,true);
+     execSQL(res,SQL,params,true);
 });
 
+/** 
+ * @swagger 
+ * /GetWatchListTVStats: 
+ *    get:
+ *        tags: 
+ *          - WatchList
+ *        summary: Get WatchList TV Stats
+ *        description: Get WatchList TV Stats
+ *        responses:  
+ *          200: 
+ *            description: "WatchList TV stats on success, ['ERROR','ERROR MESSAGE'] on error"
+ *   
+ */
 app.get('/GetWatchListTVStats', (req, res) => {
-     const SQL="WITH GetFrequentItems AS (SELECT WLI.WatchListItemName,MIN(StartDate) AS StartDate,MAX(StartDate) AS EndDate,COUNT(*) AS ItemCount FROM WatchList WL LEFT JOIN WatchListItems WLI ON WLI.WatchListItemID=WL.WatchListItemID LEFT JOIN WatchListTypes WLT ON WLT.WatchListTypeID=WLI.WatchListTypeID WHERE WLI.WatchListTypeID=2 AND WL.EndDate IS NOT NULL GROUP BY WatchListItemName) SELECT TOP(10) *,(SELECT IMDB_URL FROM WatchListItems WHERE WatchListItemName=GetFrequentItems.WatchListItemName) AS IMDB_URL FROM GetFrequentItems WHERE ItemCount > 1 ORDER BY WatchListItemName ASC";
+     const userID=(typeof req.session.userPayload !== 'undefined' ? req.session.userPayload[0].UserID : null);
+
+     if (userID === null) {
+          res.send(["ERROR","User ID was not provided"]);
+          return;
+     }
+     
+     const params=[['UserID',sql.Int,userID]];
+
+     const SQL="WITH GetFrequentItems AS (SELECT UserID,WLI.WatchListItemName,MIN(StartDate) AS StartDate,MAX(StartDate) AS EndDate,COUNT(*) AS ItemCount FROM WatchList WL LEFT JOIN WatchListItems WLI ON WLI.WatchListItemID=WL.WatchListItemID LEFT JOIN WatchListTypes WLT ON WLT.WatchListTypeID=WLI.WatchListTypeID WHERE WLI.WatchListTypeID=2 AND WL.EndDate IS NOT NULL GROUP BY UserID,WatchListItemName) SELECT TOP(10) *,(SELECT IMDB_URL FROM WatchListItems WHERE WatchListItemName=GetFrequentItems.WatchListItemName) AS IMDB_URL FROM GetFrequentItems WHERE UserID=@UserID AND ItemCount > 1 ORDER BY WatchListItemName ASC";
   
-     execSQL(res,SQL,null,true);
+     execSQL(res,SQL,params,true);
 });
 
+/** 
+ * @swagger 
+ * /IsIMDBSearchEnabled: 
+ *    get:
+ *        tags: 
+ *          - IMDB
+ *        summary: Get flag that returns true if RapidAPI key is set to allow IMDB search
+ *        description: Get flag that returns true if RapidAPI key is set to allow IMDB search
+ *        responses:  
+ *          200: 
+ *            description: "Returns true or false"
+ *   
+ */
 app.get('/IsIMDBSearchEnabled', (req, res) => {
-     if (RAPIDAPI_KEY == null)
-          res.send(false)
-     else
-          res.send(true)
+    console.log("/IsIMDBSearchEnabled");
+     if (RAPIDAPI_KEY == null) {
+          console.log("/IsIMDBSearchEnabled returning false");
+          res.send(false);
+     } else {
+          console.log("/IsIMDBSearchEnabled returning true");
+          res.send(true);
+     }
 });
 
+/** 
+ * @swagger 
+ * /Login: 
+ *    put:
+ *        tags: 
+ *          - Login
+ *        summary: Login endpoint
+ *        description: Login endpoint
+ *        parameters:
+ *           - name: wl_username
+ *             in: header
+ *             description: User name
+ *             required: true
+ *             schema:
+ *                  type: string 
+ *           - name: wl_password
+ *             in: header
+ *             description: Password
+ *             required: true
+ *             schema:
+ *                  type: string
+ *                  format: password
+ *        responses:  
+ *          200: 
+ *            description: "Returns ['OK',USERPAYLOADOBJECT] on success or 403 error if login failed" 
+ *   
+ */
+app.put('/Login', async (req, res) => {
+     const username=(typeof req.headers["wl_username"] !== 'undefined' ? req.headers["wl_username"] : null);
+     const password=(typeof req.headers["wl_password"] !== 'undefined' ? req.headers["wl_password"] : null);
+
+     if (username === null || password === null) {
+          return res.status(403).send('Unauthorized 2');
+     } else {
+          const sanitizedUsername=(typeof username === 'string' && username !== "" && username.length < 50 ? username : null);
+          const sanitizedPassword=(typeof password === 'string' && password !== "" && password.length < 50 ? password : null);
+
+          if (sanitizedUsername === null) {
+               return res.status(403).send('Unauthorized 3');
+          }
+
+          if (sanitizedPassword === null) {
+               return res.status(403).send('Unauthorized 4');
+          }
+
+          try {
+               const params = [['Username',sql.VarChar,username],['Password',sql.VarChar,password]]; 
+               const loginResult=await execSQL(res,"OPEN SYMMETRIC KEY WatchListKey DECRYPTION BY CERTIFICATE WatchListCert;SELECT TOP(1) UserID,CONVERT(VARCHAR(50),DECRYPTBYKEY(Username)) AS Username,CONVERT(VARCHAR(50),DECRYPTBYKEY(Realname)) AS Realname,CONVERT(VARCHAR(50),DECRYPTBYKEY(BackendURL)) AS BackendURL FROM Users WHERE @Username = CONVERT(VARCHAR(50),DECRYPTBYKEY(Username))AND @Password = CONVERT(VARCHAR(50),DECRYPTBYKEY(Password));CLOSE SYMMETRIC KEY WatchListKey",params,true, true);
+
+               if (loginResult[0] === "OK" && loginResult[1].length === 1) {
+                    req.session.page_views = 1
+                    req.session.userPayload=loginResult[1];
+
+                    res.send(["OK",loginResult[1]]);
+               } else {
+                    return res.status(403).send('Unauthorized 5');
+               }
+          } catch (err) {
+               return res.status(403).send('Unauthorized 6');
+          }
+     }
+});
+
+/** 
+ * @swagger 
+ * /SignOut: 
+ *    get:
+ *        tags: 
+ *          - Login
+ *        summary: Logout endpoint
+ *        description: Logout endpoint
+ *        responses:  
+ *          200: 
+ *            description: "Returns ['OK']"
+ *   
+ */
+app.get('/SignOut', (req, res) => {
+     res.send(["OK"]);
+
+     req.session.destroy();
+});
+
+/** 
+ * @swagger 
+ * /SearchIMDB: 
+ *    get:
+ *        tags: 
+ *          - IMDB
+ *        summary: Search IMDB
+ *        description: Search IMDB
+ *        parameters:
+ *           - name: SearchTerm
+ *             in: query
+ *             description: SearchTerm
+ *             required: true
+ *             schema:
+ *                  type: string
+ *        responses:  
+ *          200: 
+ *            description: "Returns search results on success or error message"
+ *   
+ */
 app.get('/SearchIMDB', (req, res) => {
      const searchTerm=(typeof req.query.SearchTerm !== 'undefined' ? req.query.SearchTerm : null); 
     
-     if (searchTerm === null)
+     if (searchTerm === null) {
           res.send("Search term not provided");
-     else if (RAPIDAPI_KEY == null)
+     } else if (RAPIDAPI_KEY == null) {
           res.send("IMDB search is not enabled");
-     else {
+     } else {
           const options = {
                method: 'GET',
                url: 'https://imdb107.p.rapidapi.com/',
@@ -383,12 +1059,69 @@ app.get('/SearchIMDB', (req, res) => {
 
           request(options, function (error, response, body) {
 	       if (error) throw new Error(error);
+
                res.send(body);
           });
      }
 });
 
-app.get('/UpdateWatchList', (req, res) => {
+/** 
+ * @swagger 
+ * /UpdateWatchList: 
+ *    put:
+ *        tags: 
+ *          - WatchList
+ *        summary: Update WatchList item
+ *        description: Update WatchList item
+ *        parameters:
+ *           - name: WatchListID
+ *             in: query
+ *             description: WatchList ID
+ *             required: true
+ *             schema:
+ *                  type: integer
+ *           - name: WatchListItemID
+ *             in: query
+ *             description: WatchList Item ID
+ *             required: false
+ *             schema:
+ *                  type: integer
+ *           - name: StartDate
+ *             in: query
+ *             description: Start Date
+ *             required: false
+ *             schema:
+ *                  type: string
+ *           - name: EndDate
+ *             in: query
+ *             description: End Date
+ *             required: false
+ *             schema:
+ *                  type: string
+ *           - name: WatchListSourceID
+ *             in: query
+ *             description: WatchList Source ID
+ *             required: false
+ *             schema:
+ *                  type: integer
+ *           - name: Season
+ *             in: query
+ *             description: Season
+ *             required: false
+ *             schema:
+ *                  type: integer
+ *           - name: Notes
+ *             in: query
+ *             description: Notes
+ *             required: false
+ *             schema:
+ *                  type: string
+ *        responses:  
+ *          200: 
+ *            description: "['OK',''] on success, ['ERROR','ERROR MESSAGE'] on error"
+ *   
+ */
+app.put('/UpdateWatchList', (req, res) => {
      const watchListID=(typeof req.query.WatchListID !== 'undefined' ? req.query.WatchListID : null);
      const watchListItemID=(typeof req.query.WatchListItemID !== 'undefined' ? req.query.WatchListItemID : null);
      const startDate=(typeof req.query.StartDate !== 'undefined' ? req.query.StartDate : null);
@@ -397,73 +1130,189 @@ app.get('/UpdateWatchList', (req, res) => {
      const season=(typeof req.query.Season !== 'undefined' ? req.query.Season : null);
      const notes=(typeof req.query.Notes !== 'undefined' ? req.query.Notes : null);
  
-     if (watchListID === null)
-          res.send(["ID was not provided"]);
-     if (watchListItemID === null)
-          res.send(["Item ID was not provided"]);
-     else if (startDate === null)
-          res.send(["Start Date was not provided"]);
-     else {
-          let params = [['WatchListID',sql.Int,watchListID],['WatchListItemID',sql.Int,watchListItemID],['StartDate',sql.VarChar,new Date(startDate).yyyymmdd()]];
-
-          if (endDate != null)
+     if (watchListID === null) {
+          res.send(["ERROR","WatchList ID was not provided"]);
+          return;
+     } else {
+          let params = [['WatchListID',sql.Int,watchListID]];
+          let updateStr='';
+          
+          if (watchListItemID !== null) {
+               params.push(['WatchListItemID',sql.Int,watchListItemID]);
+               updateStr+=`WatchListItemID=@WatchListItemID`;
+          }
+          
+          if (startDate !== null) {
+               params.push(['StartDate',sql.VarChar,new Date(startDate).yyyymmdd()]);
+               updateStr+=(updateStr == '' ? '' : ',') + `StartDate=@StartDate`;
+          }
+           
+          if (endDate !== null) {
                params.push(['EndDate',sql.VarChar,new Date(endDate).yyyymmdd()]);
+               updateStr+=(updateStr == '' ? '' : ',') + `EndDate=@EndDate`;
+          }
 
-          if (sourceID != null)
+          if (sourceID !== null) {
                params.push(['WatchListSourceID',sql.Int,sourceID]);
+               updateStr+=(updateStr == '' ? '' : ',') + `WatchListSourceID=@WatchListSourceID`;
+          }
  
-          if (sourceID != null)
-               params.push(['Source',sql.VarChar,sourceID]); // Theres a bug in Node that throws an incorrect error "Validation failed for parameter 'WatchListSourceID'. Invalid number." if using Int type
-
-          if (season != null)
-               params.push(['Season',sql.VarChar,season]); // Theres a bug in Node that throws an incorrect error "Validation failed for parameter 'WatchListSourceID'. Invalid number." if using Int type
-
-          if (notes != null)
+          if (season !== null) {
+               params.push(['Season',sql.VarChar,season]);
+               updateStr+=(updateStr == '' ? '' : ',') + `Season=@Season`;
+          }
+          
+          if (notes !== null) {
                params.push(['Notes',sql.VarChar,notes]);
-
-          const SQL=`UPDATE WatchList SET WatchListItemID=@WatchListItemID,StartDate=@StartDate` + (endDate != null ? ',EndDate=@EndDate' : `,EndDate=null`) + (sourceID != null ? `,WatchListSourceID=@WatchListSourceID` : `,WatchListSourceID=NULL`) + (season != null ? `,Season=@Season` : `,Season=NULL`) + (notes != null ? `,Notes=@Notes` : `,Notes=NULL`) + ` WHERE WatchListID=@WatchListID`;
-          //res.send(`SQL=*${SQL}* watchListID=*${watchListID}* watchListItemID=*${watchListItemID}* startDate=*${startDate}* endDate=*${endDate}* notes=*${notes}*,season=*${season}`);
-          execSQL(res,SQL,params,false);
+               updateStr+=(updateStr == '' ? '' : ',') + `Notes=@Notes`;
+          }
+          console.log(updateStr)
+          if (updateStr === '') { // No params were passed except for the mandatory columns
+               res.send(["ERROR","No params were passed"]);
+               return;
+          }
+          
+          const SQL=`UPDATE WatchList SET ${updateStr} WHERE WatchListID=@WatchListID`;
+          
+          execSQL(res,SQL,params,true);
      }
 });
 
-app.get('/UpdateWatchListItem', (req, res) => {
+/** 
+ * @swagger 
+ * /UpdateWatchListItem: 
+ *    put:
+ *        tags: 
+ *          - WatchListItems
+ *        summary: Update WatchList item
+ *        description: Update WatchList item
+ *        parameters:
+ *           - name: WatchListItemID
+ *             in: query
+ *             description: WatchList Item ID
+ *             required: true
+ *             schema:
+ *                  type: integer
+ *           - name: Name
+ *             in: query
+ *             description: Name
+ *             required: false
+ *             schema:
+ *                  type: string
+ *           - name: Type
+ *             in: query
+ *             description: Type
+ *             required: false
+ *             schema:
+ *                  type: string
+ *           - name: IMDB_URL
+ *             in: query
+ *             description: IMDB_URL
+ *             required: false
+ *             schema:
+ *                  type: string
+ *           - name: Notes
+ *             in: query
+ *             description: Notes
+ *             required: false
+ *             schema:
+ *                  type: string
+ *        responses:  
+ *          200: 
+ *            description: "['OK',''] on success, ['ERROR','ERROR MESSAGE'] on error"
+ *   
+ */
+app.put('/UpdateWatchListItem', (req, res) => {
      const watchListItemID=(typeof req.query.WatchListItemID !== 'undefined' ? req.query.WatchListItemID : null);
      const name=(typeof req.query.WatchListItemName !== 'undefined' ? req.query.WatchListItemName : null);
      const typeID=(typeof req.query.WatchListTypeID !== 'undefined' ? req.query.WatchListTypeID : null);
      const imdb_url=(typeof req.query.IMDB_URL !== 'undefined' ? req.query.IMDB_URL : null);
      const notes=(typeof req.query.ItemNotes !== 'undefined' ? req.query.ItemNotes : null);
     
-     if (watchListItemID === null)
-          res.send(["ID was not provided"]);
-     else if (name === null)
-          res.send(["Name was not provided"]);
-     else if (typeID === null)
-          res.send(["Type was not provided"]);
-     else {
-          const params = [['WatchListItemID',sql.Int,watchListItemID],['WatchListItemName',sql.VarChar,name],['WatchListTypeID',sql.VarChar,typeID]]; // Mandatory columns
+     if (watchListItemID === null) {
+          res.send(["ERROR","ID was not provided"]);
+          return;
+     } else {
+          const params = [['WatchListItemID',sql.Int,watchListItemID]]; // Mandatory column
 
-          if (imdb_url != null)
-               params.push(['IMDB_URL',sql.VarChar,imdb_url]);
+          let updateStr='';
           
-          if (notes != null && notes != 'null')
+          if (name !== null) {
+              params.push(['WatchListItemName',sql.VarChar,name]);
+              updateStr+=`WatchListItemName=@WatchListItemName`;
+          }
+          
+          if (typeID !== null) {
+              params.push(['WatchListTypeID',sql.VarChar,typeID]);
+              updateStr+=(updateStr === '' ? '' : ',' ) + `WatchListTypeID=@WatchListTypeID`;
+          }
+          
+          if (imdb_url != null) {
+               params.push(['IMDB_URL',sql.VarChar,imdb_url]);
+               updateStr+=(updateStr === '' ? '' : ',' ) + `IMDB_URL=@IMDB_URL`;
+          }
+          
+          if (notes != null && notes != 'null') {
                params.push(['ItemNotes',sql.VarChar,notes]);
+               updateStr+=(updateStr === '' ? '' : ',' ) + `ItemNotes=@ItemNotes`;
+          }
 
-          const SQL=`UPDATE WatchListItems SET WatchListItemName=@WatchListItemName,WatchListTypeID=@WatchListTypeID` + (imdb_url != null ? `,IMDB_URL=@IMDB_URL` : `,IMDB_URL=NULL`) + (notes != null ? `,ItemNotes=@ItemNotes` : `,ItemNotes=NULL`) + ` WHERE WatchListItemID=@WatchListItemID;`;
+          if (updateStr === '') { // No params were passed except for the mandatory columns
+               res.send(["ERROR","No params were passed"]);
+               return;
+          }
+          const SQL=`UPDATE WatchListItems SET ${updateStr} WHERE WatchListItemID=@WatchListItemID;`;
   
-          execSQL(res,SQL,params,false);
+          execSQL(res,SQL,params,true);
      }
 });
 
-app.get('/UpdateWatchListQueueItem', (req, res) => {
+/** 
+ * @swagger 
+ * /UpdateWatchListQueueItem: 
+ *    put:
+ *        tags: 
+ *          - WatchListQueue
+ *        summary: Update WatchList queue item
+ *        description: Update WatchList queue item
+ *        parameters:
+ *           - name: WatchListQueueItemID
+ *             in: query
+ *             description: WatchList Queue Item ID
+ *             required: true
+ *             schema:
+ *                  type: integer
+ *           - name: WatchListItemID
+ *             in: query
+ *             description: WatchList Item ID
+ *             required: true
+ *             schema:
+ *                  type: integer
+ *           - name: Notes
+ *             in: query
+ *             description: Notes
+ *             required: false
+ *             schema:
+ *                  type: string
+ *        responses:  
+ *          200: 
+ *            description: "['OK',''] on success, ['ERROR','ERROR MESSAGE'] on error"
+ *   
+ */
+app.put('/UpdateWatchListQueueItem', (req, res) => {
+     const userID=(typeof req.query.UserID !== 'undefined' ? req.query.UserID : null);
      const watchListQueueItemID=(typeof req.query.WatchListQueueItemID !== 'undefined' ? req.query.WatchListQueueItemID : null);
      const watchListItemID=(typeof req.query.WatchListItemID !== 'undefined' ? req.query.WatchListItemID : null);
      const notes=(typeof req.query.Notes !== 'undefined' ? req.query.Notes : null);
- 
-     if (watchListQueueItemID === null)
+  
+     if (userID === null) {
+          res.send(["ERROR","User ID was not provided"]);
+          return;
+     } else if (watchListQueueItemID === null) {
           res.send(["Queue Item ID was not provided"]);
-     else {
-          let params = [['WatchListQueueItemID',sql.Int,watchListQueueItemID]];
+          return;
+     } else {
+          let params = [['UserID',sql.Int,userID],['WatchListQueueItemID',sql.Int,watchListQueueItemID]];
 
           if (watchListItemID !== null)
                params.push(['WatchListItemID',sql.Int,watchListItemID]);
@@ -471,65 +1320,56 @@ app.get('/UpdateWatchListQueueItem', (req, res) => {
           if (notes != null)
                params.push(['Notes',sql.VarChar,notes]);
 
-          const SQL=`UPDATE WatchListQueueItems SET ` + (watchListItemID !== null ? `WatchListItemID=@WatchListItemID,` : ``) + (notes != null ? `Notes=@Notes` : `,Notes=NULL`) + ` WHERE WatchListQueueItemID=@WatchListQueueItemID`;
-          //res.send(`SQL=*${SQL}* watchListID=*${watchListQueueItemID}* watchListItemID=*${watchListItemID}*`);
-          execSQL(res,SQL,params,false);
+          const SQL=`UPDATE WatchListQueueItems SET ` + (watchListItemID !== null ? `WatchListItemID=@WatchListItemID,` : ``) + (notes != null ? `Notes=@Notes` : `,Notes=NULL`) + ` WHERE UserID=@UserID AND WatchListQueueItemID=@WatchListQueueItemID`;
+          execSQL(res,SQL,params,true);
      }
 });
 
-function execSQL(res,SQL,params,isQuery) {
+async function execSQL(res,SQL, params, isQuery = false, returnData=false) { // returnData returns the data to the calling method instead of sending it using res.send
      try {
-          // connect to your database
-          var connection = new Connection(config);
+          const pool = await sql.connect(config);
+		 
+	  let data = await pool.request();
 
-          sql.connect(config,function (err) {
-               if (err) {
-                    console.log(err);
-                    res.send(`An error occurred connecting to the database with the error ${err}`);
-               } else {
-                    const request = new sql.Request();
-                    
-                    if (params != null) { // parameterize SQL query parameters 
-                         for (let i=0;i<params.length;i++) {
-                              if (params[i][0] !== "SortColumn" && params[i][0] != "SortDirection") { // These columns are part of the ORDER BY and cannot be parameterized. It won't work if you try!!
-                                   request.input(params[i][0],params[i][1],params[i][2]);
-                              } else if ((params[i][0] === "SortColumn" && params[i][2] != null))  {
-                                   const approvedSortColumnNames=['WatchListID','WatchListItemID','WatchListItemName','StartDate','EndDate','WatchListTypeID','IMDB_URL'];
+	  // Bind params
+          if (params != null) { // parameterize SQL query parameters 
+               for (let i=0;i<params.length;i++) {
+                    if (params[i][0] !== "SortColumn" && params[i][0] != "SortDirection") { // These columns are part of the ORDER BY and cannot be parameterized. It won't work if you try!!
+                         data.input(params[i][0],params[i][1],params[i][2]);
+                    } else if ((params[i][0] === "SortColumn" && params[i][2] != null))  {
+                         const approvedSortColumnNames=['WatchListID','WatchListItemID','WatchListItemName','StartDate','EndDate','WatchListTypeID','IMDB_URL'];
  
-                                   if (params[i][0] == "SortColumn" && approvedSortColumnNames.includes(params[i][2]))
-                                        SQL=SQL.replace("@SortColumn",params[i][2]);
-                              } else if ((params[i][0] === "SortDirection" && params[i][2] != null))  {
-                                   const approvedSortColumnDirections=['ASC','DESC'];
+                         if (params[i][0] == "SortColumn" && approvedSortColumnNames.includes(params[i][2]))
+                              SQL=SQL.replace("@SortColumn",params[i][2]);
+                         } else if ((params[i][0] === "SortDirection" && params[i][2] != null))  {
+                              const approvedSortColumnDirections=['ASC','DESC'];
                               
-                                   if (params[i][0] == "SortDirection" && approvedSortColumnDirections.includes(params[i][2])) {
-                                        SQL=SQL.replace("@SortDirection",params[i][2]);
-                                   }
+                              if (params[i][0] == "SortDirection" && approvedSortColumnDirections.includes(params[i][2])) {
+                                   SQL=SQL.replace("@SortDirection",params[i][2]);
                               }
                          }
                     }
-                  
-                    // console.log(`SQL=${SQL} and params=${params}`);
-
-                    request.query(SQL,function (err,data) {
-                         if (err) res.send(err)
-
-                         // if SQL is a query send records as a response
-                         if (isQuery)
-                              try {
-                                   res.send(data.recordset);
-                              } catch(error) {
-                                   console.log(`The error ${error} occurred with the SQL query ${SQL} and the params ${params}`);
-                              } 
-                         else
-                              res.send('');
-                    });
                }
-          });
-     } catch(e) {
-          console.log("Error!");
-          res.send("Error is " + e);
+                 
+          const result=await data.query(SQL);
+         		 
+          pool.close;
+          sql.close;
+
+          if (isQuery)
+	       if (!returnData)
+	            res.send(result.recordset);
+	       else
+                    return ["OK",result.recordset];
+	  else
+	       return ["OK",""];
+     } catch (err) {
+          const errorMsg=`execSQL(): An error occurred executing the SQL ${SQL} and the params ${params} with the error ${err}`;
+	  console.log(errorMsg);
+     	  return["ERROR",errorMsg];
      }
 }
 
 app.listen(PORT, HOST);
 console.log(`Running on http://${HOST}:${PORT}`);
+
