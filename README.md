@@ -16,7 +16,7 @@ Docker Installation:
 1. Build the backend image: `docker build docker/ -t watchlistbackend:latest`
 1. Edit `watchlistbackend-compose.yml`
    - Replace NETWORKNAME with your own Docker network name
-   - Replace YOUR_AUTH_KEY with a secure password. You will need to enter this in the front end app
+   - Replace YOUR_SECRET with a password of your choice.
    - (Optional) Follow these steps if you want to be able to search IMDB directly in the app. Otherwise, do not set the environment var RAPIDAPIKEY
    
      a. Visit [RapidAPI](rapidapi.com) and create a free account.
@@ -42,7 +42,7 @@ Docker Installation:
 Non-Docker Installation:
 
 1. Set the following environment variables on the Node server to configure the DB connection: WatchList_User, WatchList_Password, WatchList_Host and WatchList_DB
-1. Set the environment variable AUTH_KEY to a password of your choice. You will need to enter this in the front end app
+1. Set the environment variable SECRET with a password of your choice.
 1. See note above if you want to enable IMDB search in the app
 1. See step above if you are behind a reverse proxy
 1. Run `node watchlistbackend.js`

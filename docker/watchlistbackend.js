@@ -13,7 +13,6 @@ const swaggerUi = require('swagger-ui-express');
 const swaggerJSDoc = require('swagger-jsdoc');
 const util = require('util');
 
-const AUTH_KEY=process.env.AUTH_KEY;
 const RAPIDAPI_KEY=process.env.RAPIDAPI_KEY
 const app = express();
 
@@ -47,7 +46,7 @@ Date.prototype.yyyymmdd = function() {
 const memoryStore = new session.MemoryStore();
 
 const sessionConfig = {
-     secret: '2RausqaEmiFjKHE4U5',
+     secret: process.env.SECRET,
      resave: 'save',
      saveUninitialized: true,
      store: memoryStore,

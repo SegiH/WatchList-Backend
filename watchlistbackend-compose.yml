@@ -13,7 +13,7 @@ services:
         image: watchlistbackend:latest
         hostname: WatchListBackend
         environment:
-               - AUTH_KEY=YOUR_AUTH_KEY
+               - SECRET=YOUR_SECRET
                
                # RAPID_API_KEY is optional and is only required if you want to be able to search IMDB instead of manually adding an IMDB URL. Register for a 
                # free account at https://rapidapi.com and add a "Movie Database (IMDB Alternative)" API to get an API key. Please note that even though it is 
