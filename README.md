@@ -29,7 +29,7 @@ Docker Installation:
      h. Click on the eye icon to show your API key and copy it to the clipboard.
      i. Add a variable in the compose file RAPIDAPIKEY=APIKEY
      j. Important note: RapidAPI allows you 100 free searches per month. In order for this API to work, you have to "subscribe" by adding your credit card with RapidAPI. It appears to work similarly to Amazon where they won't charge you if you do not go over your allotted API usage. If you do not add a credit card, the API will return an "Unsubscribed" error when you try to use it.
-   - Replace the DB related environment variables with your own DB settings. The backend must be a SQL Server database.
+   - Replace the DB related environment variables with your own DB settings in docker/watchlistbackend.js. The backend must be a SQL Server database.
 1. If you use a reverse proxy:
    - Make sure to allow GET, OPTIONS and PUT
    - Allow CORS header for the following URLS: http://localhost, http://localhost:8100 and the public URL that this WatchList backend service will be accessible at.

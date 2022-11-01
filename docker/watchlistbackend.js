@@ -13,6 +13,7 @@ const swaggerUi = require('swagger-ui-express');
 const swaggerJSDoc = require('swagger-jsdoc');
 const util = require('util');
 
+const AUTH_KEY=process.env.AUTH_KEY;
 const RAPIDAPI_KEY=process.env.RAPIDAPI_KEY
 const app = express();
 
@@ -21,10 +22,10 @@ const PORT = 8080;
 const HOST = '0.0.0.0';
 
 const config = {
-     user: 'Watchlist',
-     password: 'watchlist2021',
-     server: 'sqlserver.hovav.org',
-     database: 'WatchList',
+     user: process.env.WatchList_User,
+     password: process.env.WatchList_Password,
+     server: process.env.WatchList_Host,
+     database: process.env.WatchList_DB,
      trustServerCertificate: true
 };
 
@@ -46,7 +47,7 @@ Date.prototype.yyyymmdd = function() {
 const memoryStore = new session.MemoryStore();
 
 const sessionConfig = {
-     secret: process.env.SECRET,
+     secret: process.env.Secret,
      resave: 'save',
      saveUninitialized: true,
      store: memoryStore,
@@ -347,7 +348,7 @@ app.put('/AddWatchList', (req, res) => {
           } else {
                values+=`,NULL`;
           } 
-  
+
           const SQL=`INSERT INTO WatchList(${columns}) VALUES (${values});`;
 
           execSQL(res,SQL,params,true);
@@ -878,7 +879,7 @@ app.get('/GetWatchListMovieStats', (req, res) => {
      
      const params=[['UserID',sql.Int,userID]];
 
-     const SQL="WITH GetFrequentItems AS (SELECT UserID,WatchListItemName,COUNT(*) AS ItemCount FROM WatchList WL LEFT JOIN WatchListItems WLI ON WLI.WatchListItemID=WL.WatchListItemID WHERE WLI.WatchListTypeID=1 GROUP BY UserID,WatchListItemName) SELECT TOP(10) *,(SELECT IMDB_URL FROM WatchListItems WHERE WatchListItemName=GetFrequentItems.WatchListItemName) AS IMDB_URL FROM GetFrequentItems WHERE UserID=@UserID AND ItemCount > 1 ORDER BY WatchListItemName ASC";
+     const SQL="WITH GetFrequentItems AS (SELECT UserID,WatchListItemName,COUNT(*) AS ItemCount FROM WatchList WL LEFT JOIN WatchListItems WLI ON WLI.WatchListItemID=WL.WatchListItemID WHERE WLI.WatchListTypeID=1 GROUP BY UserID,WatchListItemName) SELECT TOP(10) *,(SELECT IMDB_URL FROM WatchListItems WHERE WatchListItemName=GetFrequentItems.WatchListItemName) AS IMDB_URL FROM GetFrequentItems WHERE UserID=@UserID AND ItemCount > 1 ORDER BY ItemCount DESC";
   
      execSQL(res,SQL,params,true);
 });
@@ -906,7 +907,7 @@ app.get('/GetWatchListTVStats', (req, res) => {
      
      const params=[['UserID',sql.Int,userID]];
 
-     const SQL="WITH GetFrequentItems AS (SELECT UserID,WLI.WatchListItemName,MIN(StartDate) AS StartDate,MAX(StartDate) AS EndDate,COUNT(*) AS ItemCount FROM WatchList WL LEFT JOIN WatchListItems WLI ON WLI.WatchListItemID=WL.WatchListItemID LEFT JOIN WatchListTypes WLT ON WLT.WatchListTypeID=WLI.WatchListTypeID WHERE WLI.WatchListTypeID=2 AND WL.EndDate IS NOT NULL GROUP BY UserID,WatchListItemName) SELECT TOP(10) *,(SELECT IMDB_URL FROM WatchListItems WHERE WatchListItemName=GetFrequentItems.WatchListItemName) AS IMDB_URL FROM GetFrequentItems WHERE UserID=@UserID AND ItemCount > 1 ORDER BY WatchListItemName ASC";
+     const SQL="WITH GetFrequentItems AS (SELECT UserID,WLI.WatchListItemName,MIN(StartDate) AS StartDate,MAX(StartDate) AS EndDate,COUNT(*) AS ItemCount FROM WatchList WL LEFT JOIN WatchListItems WLI ON WLI.WatchListItemID=WL.WatchListItemID LEFT JOIN WatchListTypes WLT ON WLT.WatchListTypeID=WLI.WatchListTypeID WHERE WLI.WatchListTypeID=2 AND WL.EndDate IS NOT NULL GROUP BY UserID,WatchListItemName) SELECT TOP(10) *,(SELECT IMDB_URL FROM WatchListItems WHERE WatchListItemName=GetFrequentItems.WatchListItemName) AS IMDB_URL FROM GetFrequentItems WHERE UserID=@UserID AND ItemCount > 1 ORDER BY ItemCount DESC";
   
      execSQL(res,SQL,params,true);
 });
@@ -925,12 +926,9 @@ app.get('/GetWatchListTVStats', (req, res) => {
  *   
  */
 app.get('/IsIMDBSearchEnabled', (req, res) => {
-    console.log("/IsIMDBSearchEnabled");
      if (RAPIDAPI_KEY == null) {
-          console.log("/IsIMDBSearchEnabled returning false");
           res.send(false);
      } else {
-          console.log("/IsIMDBSearchEnabled returning true");
           res.send(true);
      }
 });
@@ -1149,6 +1147,8 @@ app.put('/UpdateWatchList', (req, res) => {
           if (endDate !== null) {
                params.push(['EndDate',sql.VarChar,new Date(endDate).yyyymmdd()]);
                updateStr+=(updateStr == '' ? '' : ',') + `EndDate=@EndDate`;
+          } else {
+               updateStr+=(updateStr == '' ? '' : ',') + `EndDate=NULL`;
           }
 
           if (sourceID !== null) {
@@ -1165,7 +1165,7 @@ app.put('/UpdateWatchList', (req, res) => {
                params.push(['Notes',sql.VarChar,notes]);
                updateStr+=(updateStr == '' ? '' : ',') + `Notes=@Notes`;
           }
-          console.log(updateStr)
+ 
           if (updateStr === '') { // No params were passed except for the mandatory columns
                res.send(["ERROR","No params were passed"]);
                return;
