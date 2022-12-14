@@ -1,8 +1,6 @@
 //use 'strict';
 
-const backend="SQLServer";
 const bodyParser = require('body-parser');
-// const cors = require('cors');
 const express = require('express');
 const session = require('express-session');
 const sql = require('mssql');
@@ -14,7 +12,7 @@ const swaggerJSDoc = require('swagger-jsdoc');
 const util = require('util');
 
 const AUTH_KEY=process.env.AUTH_KEY;
-const RAPIDAPI_KEY=process.env.RAPIDAPI_KEY
+const RAPIDAPI_KEY=process.env.RAPIDAPI_KEY;
 const app = express();
 
 // Constants
@@ -220,8 +218,7 @@ app.use(express.static('swagger'));
 app.use(session(sessionConfig));
 
 const swaggerDocs = swaggerJSDoc(swaggerOptions);
-app.use('/swagger',swaggerUi.serve,swaggerUi.setup(swaggerDocs));  
-// app.use(cors(corsOptions));
+app.use('/swagger',swaggerUi.serve,swaggerUi.setup(swaggerDocs));
 
 // Middleware that is called before any endpoint is reached
 app.use(function (req, res, next) {
@@ -242,6 +239,80 @@ app.use(function (req, res, next) {
 app.get('/', (req, res) => {
      res.send("");
 });
+
+/*
+app.get('/GetPosters', async (req, res) => {
+     const SQL=`SELECT TOP(50) WatchListItems.WatchListItemID,CASE WHEN WatchListItems.WatchListItemAltName IS NOT NULL THEN WatchListItems.WatchListItemAltName ELSE WatchListItems.WatchListItemName END AS WatchListItemName,WatchListItems.IMDB_URL FROM WatchListItems LEFT JOIN IMDBPosters on IMDBPosters.WatchListItemID=WatchListItems.WatchListItemID WHERE IMDBPosters.PosterURL IS NULL
+     AND imdb_url is not null
+     AND WatchListItems.WatchListItemID NOT IN(10,28,84,92,163,170,178,260,261,344)
+     ORDER BY WatchListItemID`;
+     const result=await execSQL(res,SQL,null,true,true);
+     let posterResults=[];
+
+     if (result[0] !== "OK") {
+         res.send("Oh shit" + result[1]);
+         return;
+     }
+
+     const items=result[1];
+
+     for (let i=0;i<items.length;i++) {
+         console.log(`Starting ${items[i]["WatchListItemName"]}`);
+         const options = {
+               method: 'GET',
+               url: 'https://imdb107.p.rapidapi.com/',
+               qs: {s: items[i]["WatchListItemName"], page: '1', r: 'json'},
+               headers: {
+                    'x-rapidapi-host': 'movie-database-alternative.p.rapidapi.com',
+                    'x-rapidapi-key': RAPIDAPI_KEY,
+                    useQueryString: true
+               }
+          };
+
+          await new Promise(resolve => setTimeout(resolve, 1000));
+
+          request(options, async function (error, response, body) {
+	           if (error) {
+                   console.log(error)
+                   throw new Error(error);
+               }
+
+               const searchResults=JSON.parse(body);
+               //console.log(searchResults);
+               if ((typeof searchResults["Response"] !== 'undefined' && searchResults["Response"] == "False") || typeof searchResults["Search"] === 'undefined') {
+                   //posterResults.push([items[i]["WatchListItemID"],searchResults["Error"]]);
+                   console.log(`Not adding ${items[i]["WatchListItemName"]} because ${body}`);
+                   return;
+               }
+
+               for (let j=0;j<searchResults["Search"].length;j++) {
+                    const imdbURL=`https://www.imdb.com/title/${searchResults["Search"][j].imdbID}`;
+
+                    try {
+                        const itemIMDBURL=items[i]["IMDB_URL"].slice(0,items[i]["IMDB_URL"].length-1);
+//console.log(`itemIMDBURL=${itemIMDBURL} imdbURL=${imdbURL}`);
+                        if (itemIMDBURL === imdbURL) {
+                            const params=[['WatchListItemID',sql.Int,items[i]["WatchListItemID"]],['PosterURL',sql.VarChar,searchResults["Search"][j]["Poster"]]];
+                            const SQL="IF (SELECT COUNT(*) FROM IMDBPosters WHERE WatchListItemID=@WatchListItemID) = 0 INSERT INTO IMDBPosters(WatchListItemID,PosterURL) VALUES(@WatchListItemID,@PosterURL) ELSE UPDATE IMDBPosters SET PosterURL=@PosterURL WHERE WatchListItemID=@WatchListItemID";
+
+                            //posterResults.push([items[i]["WatchListItemID"],"OK"]);
+                            console.log(`Adding ${items[i]["WatchListItemName"]}`);
+                            execSQL(res,SQL,params,true,true);
+
+                            continue;
+                        }
+                    } catch(e) {
+                        console.log(`Not adding ${items[i]["WatchListItemID"]} because error ${e}`);
+                        break;
+                    }
+               }
+          });
+
+          if (i==items.length-1) {
+              return res.send("");
+          }
+     }
+});*/
 
 /** 
  * @swagger 
@@ -386,7 +457,7 @@ app.put('/AddWatchList', (req, res) => {
  *        parameters:
  *           - name: WatchListItemName
  *             in: query
- *             description: WatchListItemName
+ *             description: Name
  *             required: true
  *             schema:
  *                  type: string
@@ -398,7 +469,13 @@ app.put('/AddWatchList', (req, res) => {
  *                  type: string
  *           - name: IMDB_URL
  *             in: query
- *             description: IMDB_URL
+ *             description: IMDB URL
+ *             required: false
+ *             schema:
+ *                  type: string
+ *           - name: IMDB_Poster
+ *             in: query
+ *             description: IMDB image
  *             required: false
  *             schema:
  *                  type: string
@@ -417,6 +494,7 @@ app.put('/AddWatchListItem', (req, res) => {
      const name=(typeof req.query.WatchListItemName !== 'undefined' ? req.query.WatchListItemName : null);
      const type=(typeof req.query.WatchListTypeID !== 'undefined' ? req.query.WatchListTypeID : null);
      const imdb_url=(typeof req.query.IMDB_URL !== 'undefined' ? req.query.IMDB_URL : null);
+     const imdb_poster=(typeof req.query.IMDB_Poster !== 'undefined' ? req.query.IMDB_Poster : null);
      const notes=(typeof req.query.Notes !== 'undefined' ? req.query.Notes : null);
     
      if (name === null) {
@@ -438,7 +516,16 @@ app.put('/AddWatchListItem', (req, res) => {
                values+=`,@IMDB_URL`;
           } else {
                values+=`,NULL`;
-          } 
+          }
+
+          columns+=`,IMDB_Poster`;
+
+          if (imdb_poster != null) {
+               params.push(['IMDB_Poster',sql.VarChar,imdb_poster]);
+               values+=`,@IMDB_Poster`;
+          } else {
+               values+=`,NULL`;
+          }
 
           columns+=`,ItemNotes`;
 
@@ -657,6 +744,12 @@ app.put('/DeleteWatchListQueueItem', (req, res) => {
  *             required: false
  *             schema:
  *                  type: integer
+ *           - name: TypeFilter
+ *             in: query
+ *             description: TypeFilter
+ *             required: false
+ *             schema:
+ *                  type: integer
  *           - name: IncompleteFilter
  *             in: query
  *             description: IncompleteFilter
@@ -674,10 +767,8 @@ app.get('/GetWatchList', (req, res) => {
      let sortDirection=(typeof req.query.SortDirection !== 'undefined' ? req.query.SortDirection : null);
      let recordLimit=(typeof req.query.RecordLimit !== 'undefined' ? req.query.RecordLimit : null);
      let sourceFilter=(typeof req.query.SourceFilter !== 'undefined' ? req.query.SourceFilter : null);
+     let typeFilter=(typeof req.query.TypeFilter !== 'undefined' ? req.query.TypeFilter : null);
      let incompleteFilter=(req.query.IncompleteFilter === "true" ? true : false);
-
-     if (recordLimit == null)
-          recordLimit=10;
 
      if (sortColumn === null || typeof sortColumn == 'undefined')
           sortColumn="WatchListItemName";
@@ -687,9 +778,9 @@ app.get('/GetWatchList', (req, res) => {
           sortColumn="WatchListItemName";
      else if (sortColumn === "StartDate" || sortColumn === "EndDate") {} // Nothing to do for these columns
 
-     if (sortDirection === null || typeof sortDirection == 'undefined' ||(sortDirection !== "ASC" && sortDirection != "DESC")) 
+     if (sortDirection === null || typeof sortDirection == 'undefined' ||(sortDirection !== "ASC" && sortDirection != "DESC"))
           sortDirection="ASC";
-    
+
      let params  = [];
 
      let whereClause = ``;
@@ -703,13 +794,17 @@ app.get('/GetWatchList', (req, res) => {
           whereClause+=(whereClause === `` ? ` WHERE ` : ` AND `) + ` WatchList.WatchListSourceID=${sourceFilter}`;
      }
 
+     if (typeFilter != null) {
+          whereClause+=(whereClause === `` ? ` WHERE ` : ` AND `) + ` WatchListItems.WatchListTypeID=${typeFilter}`;
+     }
+
      if (incompleteFilter == true) {
           whereClause+=(whereClause === `` ? ` WHERE ` : ` AND `) + ` WatchList.EndDate IS NULL`;
      }
        
      const orderBy=` ORDER BY ${(sortColumn == "WatchListItemName" ? `WatchListItems` : `WatchList`)}.${sortColumn} ${sortDirection}`;
 
-     const SQL=`SELECT ` + (recordLimit != null ? `TOP(${recordLimit})` : ``) + ` WatchListID,WatchList.WatchListItemID,WatchListTypes.WatchListTypeID,CONVERT(VARCHAR(10),StartDate,126) AS StartDate,CONVERT(VARCHAR(10),EndDate,126) AS EndDate,WatchList.WatchListSourceID,Season,Rating,Notes FROM WatchList LEFT JOIN WatchListItems ON WatchListItems.WatchListItemID=WatchList.WatchListItemID LEFT JOIN WatchListTypes ON WatchListTypes.WatchListTypeID=WatchListItems.WatchListTypeID LEFT JOIN WatchListSources ON WatchListSources.WatchListSourceID=WatchList.WatchListSourceID` + whereClause + orderBy;
+     const SQL=`SELECT ` + (recordLimit != null ? `TOP(${recordLimit})` : ``) + ` WatchListID,WatchList.WatchListItemID,WatchListTypes.WatchListTypeID,CONVERT(VARCHAR(10),StartDate,126) AS StartDate,CONVERT(VARCHAR(10),EndDate,126) AS EndDate,WatchList.WatchListSourceID,Season,Rating,Notes,IMDB_URL,IMDB_Poster FROM WatchList LEFT JOIN WatchListItems ON WatchListItems.WatchListItemID=WatchList.WatchListItemID LEFT JOIN WatchListTypes ON WatchListTypes.WatchListTypeID=WatchListItems.WatchListTypeID LEFT JOIN WatchListSources ON WatchListSources.WatchListSourceID=WatchList.WatchListSourceID` + whereClause + orderBy;
 
      execSQL(res,SQL,params,true);
 });
@@ -783,7 +878,7 @@ app.get('/GetWatchListItems', (req, res) => {
 
      if (searchTerm != null) {
           params.push(['SearchTerm',sql.VarChar,searchTerm]);
-          whereClause=`WHERE (WatchListItemName LIKE '%' + @SearchTerm + '%' OR IMDB_URL LIKE '%' + @SearchTerm + '%')`;
+          whereClause=`WHERE (WatchListItemName LIKE '%' + @SearchTerm + '%' OR IMDB_URL LIKE '%' + @SearchTerm + '%' OR ItemNotes LIKE '%' + @SearchTerm + '%')`;
      }
 
      if (IMDBURLMissing == true) {
@@ -833,7 +928,7 @@ app.get('/GetWatchListQueue', (req, res) => {
           whereClause=+` AND (WatchListItemName LIKE '%' + @SearchTerm + '%' OR Notes LIKE '%' + @SearchTerm + '%')`;
      }
  
-     const SQL=`SELECT WatchListQueueItemID, WatchListItems.WatchListItemID, WatchListTypes.WatchListTypeID, Notes FROM WatchListQueueItems LEFT JOIN WatchListItems ON WatchListItems.WatchListItemID=WatchListQueueItems.WatchListItemID LEFT JOIN WatchListTypes ON WatchListTypes.WatchListTypeID=WatchListItems.WatchListTypeID ` + whereClause;
+     const SQL=`SELECT WatchListQueueItemID, WatchListItems.WatchListItemID, WatchListItems.WatchListItemName, WatchListTypes.WatchListTypeID, Notes, IMDB_Poster FROM WatchListQueueItems LEFT JOIN WatchListItems ON WatchListItems.WatchListItemID=WatchListQueueItems.WatchListItemID LEFT JOIN WatchListTypes ON WatchListTypes.WatchListTypeID=WatchListItems.WatchListTypeID ` + whereClause;
  
      execSQL(res,SQL,params,true);
 });
@@ -1132,7 +1227,6 @@ app.get('/SearchIMDB', (req, res) => {
 
           request(options, function (error, response, body) {
 	       if (error) throw new Error(error);
-
                res.send(body);
           });
      }
@@ -1301,6 +1395,12 @@ app.put('/UpdateWatchList', (req, res) => {
  *             required: false
  *             schema:
  *                  type: string
+ *           - name: IMDB_Poster
+ *             in: query
+ *             description: IMDB_URL
+ *             required: false
+ *             schema:
+ *                  type: string
  *           - name: Notes
  *             in: query
  *             description: Notes
@@ -1317,6 +1417,7 @@ app.put('/UpdateWatchListItem', (req, res) => {
      const name=(typeof req.query.WatchListItemName !== 'undefined' ? req.query.WatchListItemName : null);
      const typeID=(typeof req.query.WatchListTypeID !== 'undefined' ? req.query.WatchListTypeID : null);
      const imdb_url=(typeof req.query.IMDB_URL !== 'undefined' ? req.query.IMDB_URL : null);
+     const imdb_poster=(typeof req.query.IMDB_Poster !== 'undefined' ? req.query.IMDB_Poster : null);
      const notes=(typeof req.query.ItemNotes !== 'undefined' ? req.query.ItemNotes : null);
     
      if (watchListItemID === null) {
@@ -1342,6 +1443,12 @@ app.put('/UpdateWatchListItem', (req, res) => {
                updateStr+=(updateStr === '' ? '' : ',' ) + `IMDB_URL=@IMDB_URL`;
           }
           
+          if (imdb_poster != null) {
+              console.log(`IMDB_Poster=${imdb_poster}`);
+               params.push(['IMDB_Poster',sql.VarChar,imdb_poster]);
+               updateStr+=(updateStr === '' ? '' : ',' ) + `IMDB_Poster=@IMDB_Poster`;
+          }
+
           if (notes != null && notes != 'null') {
                params.push(['ItemNotes',sql.VarChar,notes]);
                updateStr+=(updateStr === '' ? '' : ',' ) + `ItemNotes=@ItemNotes`;
