@@ -852,12 +852,6 @@ app.get('/GetWatchList', (req, res) => {
  *        summary: Get WatchList Items records
  *        description: Get WatchList Items records
  *        parameters:
- *           - name: UserID
- *             in: query
- *             description: User ID
- *             required: true
- *             schema:
- *                  type: integer
  *           - name: RecordLimit
  *             in: query
  *             description: Record Limit
@@ -894,17 +888,11 @@ app.get('/GetWatchList', (req, res) => {
  *   
  */
 app.get('/GetWatchListItems', (req, res) => {
-     const userID=(typeof req.session.userPayload !== 'undefined' ? req.session.userPayload[0].UserID : null);
 	 const searchTerm=(typeof req.query.SearchTerm !== 'undefined' ? req.query.SearchTerm : null); 
      const IMDBURLMissing=(req.query.IMDBURLMissing == "true" ? true : false);
      let recordLimit=(typeof req.query.RecordLimit !== 'undefined' ? req.query.RecordLimit : null);
      let sortColumn=(typeof req.query.SortColumn !== 'undefined' ? req.query.SortColumn : null);
      let sortDirection=(typeof req.query.SortDirection !== 'undefined' ? req.query.SortDirection : null);
-
-     if (userID === null) {
-          res.send(["User ID was not provided"]);
-          return;
-     }
 
      if (sortColumn === null || typeof sortColumn == 'undefined')
           sortColumn="WatchListItemName";
@@ -919,12 +907,12 @@ app.get('/GetWatchListItems', (req, res) => {
      if (sortDirection === null || typeof sortDirection == 'undefined' ||(sortDirection !== "ASC" && sortDirection != "DESC"))
           sortDirection="ASC";
      
-     let params = [['UserID',sql.Int,userID],['SortColumn',null,sortColumn],['SortDirection',null,sortDirection]];
-     let whereClause=` WHERE UserID=@UserID`;
+     let params = [['SortColumn',null,sortColumn],['SortDirection',null,sortDirection]];
+     let whereClause=``;
 
      if (searchTerm != null) {
           params.push(['SearchTerm',sql.VarChar,searchTerm]);
-          whereClause=` AND (WatchListItemName LIKE '%' + @SearchTerm + '%' OR IMDB_URL LIKE '%' + @SearchTerm + '%' OR ItemNotes LIKE '%' + @SearchTerm + '%')`;
+          whereClause+=(whereClause == '' ? ` WHERE ` : ` AND `) + ` (WatchListItemName LIKE '%' + @SearchTerm + '%' OR IMDB_URL LIKE '%' + @SearchTerm + '%' OR ItemNotes LIKE '%' + @SearchTerm + '%')`;
      }
 
      if (IMDBURLMissing == true) {
