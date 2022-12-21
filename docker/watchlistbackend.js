@@ -232,6 +232,8 @@ app.use(function (req, res, next) {
           }
      } else if (req.url.startsWith("/Login")){
           next();
+     } else {
+          res.sendStatus("403");
      }
 });
 
@@ -461,12 +463,6 @@ app.put('/AddWatchList', (req, res) => {
  *        summary: Add new WatchList item
  *        description: Add WatchList item
  *        parameters:
-  *           - name: UserID
- *             in: query
- *             description: User ID
- *             required: true
- *             schema:
- *                  type: integer
  *           - name: WatchListItemName
  *             in: query
  *             description: Name
@@ -503,27 +499,23 @@ app.put('/AddWatchList', (req, res) => {
  *   
  */
 app.put('/AddWatchListItem', (req, res) => {
-	 const userID=(typeof req.session.userPayload !== 'undefined' ? req.session.userPayload[0].UserID : null);
      const name=(typeof req.query.WatchListItemName !== 'undefined' ? req.query.WatchListItemName : null);
      const type=(typeof req.query.WatchListTypeID !== 'undefined' ? req.query.WatchListTypeID : null);
      const imdb_url=(typeof req.query.IMDB_URL !== 'undefined' ? req.query.IMDB_URL : null);
      const imdb_poster=(typeof req.query.IMDB_Poster !== 'undefined' ? req.query.IMDB_Poster : null);
      const notes=(typeof req.query.Notes !== 'undefined' ? req.query.Notes : null);
     
-	 if (userID === null) {
-          res.send(["User ID was not provided"]);
-          return;
-	 } else if (name === null) {
+     if (name === null) {
           res.send(["ERROR","Name was not provided"]);
           return;
      } else if (type === null) {
           res.send(["ERROR","Type was not provided"]);
           return;
      } else {
-          const params = [['UserID',sql.Int,userID],['WatchListItemName',sql.VarChar,name],['WatchListTypeID',sql.VarChar,type]];
+          const params = [['WatchListItemName',sql.VarChar,name],['WatchListTypeID',sql.VarChar,type]];
 
-          let columns=`UserID,WatchListItemName,WatchListTypeID`;
-          let values = `@UserID,@WatchListItemName,@WatchListTypeID`;
+          let columns=`WatchListItemName,WatchListTypeID`;
+          let values = `@WatchListItemName,@WatchListTypeID`;
 
           columns+=`,IMDB_URL`;
 
@@ -736,12 +728,6 @@ app.put('/DeleteWatchListQueueItem', (req, res) => {
  *        summary: Get WatchList records
  *        description: Get WatchList records
  *        parameters:
- *           - name: UserID
- *             in: query
- *             description: User ID
- *             required: true
- *             schema:
- *                  type: integer
  *           - name: RecordLimit
  *             in: query
  *             description: Record Limit
@@ -790,7 +776,7 @@ app.put('/DeleteWatchListQueueItem', (req, res) => {
  *   
  */
 app.get('/GetWatchList', (req, res) => {
-	 const userID=(typeof req.session.userPayload !== 'undefined' ? req.session.userPayload[0].UserID : null);
+     const userID=(typeof req.session.userPayload !== 'undefined' ? req.session.userPayload[0].UserID : null);
      const searchTerm=(typeof req.query.SearchTerm !== 'undefined' ? req.query.SearchTerm : null); 
      let sortColumn=(typeof req.query.SortColumn !== 'undefined' ? req.query.SortColumn : null);
      let sortDirection=(typeof req.query.SortDirection !== 'undefined' ? req.query.SortDirection : null);
@@ -803,8 +789,8 @@ app.get('/GetWatchList', (req, res) => {
           res.send(["User ID was not provided"]);
           return;
      }
-	 
-	 if (sortColumn === null || typeof sortColumn == 'undefined')
+
+     if (sortColumn === null || typeof sortColumn == 'undefined')
           sortColumn="WatchListItemName";
      else if (sortColumn === "ID")
           sortColumn="WatchListID";
@@ -816,10 +802,9 @@ app.get('/GetWatchList', (req, res) => {
           sortDirection="ASC";
 
      let params  = [['UserID',sql.Int,userID]];
-
      let whereClause = ` WHERE UserID=@UserID`;
 
-	 if (searchTerm != null) {
+     if (searchTerm != null) {
           params.push(['SearchTerm',sql.VarChar,searchTerm]);
           whereClause+=` AND (WatchListItemName LIKE '%' + @SearchTerm + '%' OR Notes LIKE '%' + @SearchTerm + '%')`;
      }
@@ -835,9 +820,9 @@ app.get('/GetWatchList', (req, res) => {
      if (incompleteFilter == true) {
           whereClause+=` AND WatchList.EndDate IS NULL`;
      }
-       
-     const orderBy=` ORDER BY ${(sortColumn == "WatchListItemName" ? `WatchListItems` : `WatchList`)}.${sortColumn} ${sortDirection}`;
 
+     const orderBy=` ORDER BY ${(sortColumn == "WatchListItemName" ? `WatchListItems` : `WatchList`)}.${sortColumn} ${sortDirection}`;
+ 
      const SQL=`SELECT ` + (recordLimit != null ? `TOP(${recordLimit})` : ``) + ` WatchListID,WatchList.WatchListItemID,WatchListTypes.WatchListTypeID,CONVERT(VARCHAR(10),StartDate,126) AS StartDate,CONVERT(VARCHAR(10),EndDate,126) AS EndDate,WatchList.WatchListSourceID,Season,Rating,Notes,IMDB_URL,IMDB_Poster FROM WatchList LEFT JOIN WatchListItems ON WatchListItems.WatchListItemID=WatchList.WatchListItemID LEFT JOIN WatchListTypes ON WatchListTypes.WatchListTypeID=WatchListItems.WatchListTypeID LEFT JOIN WatchListSources ON WatchListSources.WatchListSourceID=WatchList.WatchListSourceID` + whereClause + orderBy;
 
      execSQL(res,SQL,params,true);
@@ -853,7 +838,6 @@ app.get('/GetWatchList', (req, res) => {
  *        description: Get WatchList Items records
  *        parameters:
  *           - name: RecordLimit
- *             in: query
  *             description: Record Limit
  *             required: false
  *             schema:
@@ -888,7 +872,8 @@ app.get('/GetWatchList', (req, res) => {
  *   
  */
 app.get('/GetWatchListItems', (req, res) => {
-	 const searchTerm=(typeof req.query.SearchTerm !== 'undefined' ? req.query.SearchTerm : null); 
+     // WatchListItems applies to all users so no need to provide user ID
+     const searchTerm=(typeof req.query.SearchTerm !== 'undefined' ? req.query.SearchTerm : null); 
      const IMDBURLMissing=(req.query.IMDBURLMissing == "true" ? true : false);
      let recordLimit=(typeof req.query.RecordLimit !== 'undefined' ? req.query.RecordLimit : null);
      let sortColumn=(typeof req.query.SortColumn !== 'undefined' ? req.query.SortColumn : null);
@@ -912,7 +897,7 @@ app.get('/GetWatchListItems', (req, res) => {
 
      if (searchTerm != null) {
           params.push(['SearchTerm',sql.VarChar,searchTerm]);
-          whereClause+=(whereClause == '' ? ` WHERE ` : ` AND `) + ` (WatchListItemName LIKE '%' + @SearchTerm + '%' OR IMDB_URL LIKE '%' + @SearchTerm + '%' OR ItemNotes LIKE '%' + @SearchTerm + '%')`;
+          whereClause+=(whereClause === '' ? ` WHERE ` : ` AND `) + `(WatchListItemName LIKE '%' + @SearchTerm + '%' OR IMDB_URL LIKE '%' + @SearchTerm + '%' OR ItemNotes LIKE '%' + @SearchTerm + '%')`;
      }
 
      if (IMDBURLMissing == true) {
