@@ -1,3 +1,5 @@
+NOTE: This repo is no longer being updated. I have included this code into the main WatchList Repo. Do not check out this code!
+
 # WatchList-Backend
 This is the backend for WatchList application. It includes a [Swagger](https://swagger.io/) backend that can be used to test each endpoint. It supports multiple users using the application.
 
